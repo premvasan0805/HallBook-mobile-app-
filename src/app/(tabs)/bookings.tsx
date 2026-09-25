@@ -7,9 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CompactBrandHeader } from '@/components/brand-header';
 import { openBooking } from '@/components/cards';
-import { BrandGradient, Mandala } from '@/components/decor';
-import { OptionCard } from '@/components/form';
-import { BottomSheet } from '@/components/overlays';
+import { BrandGradient } from '@/components/decor';
 import { EmptyState, Touchable } from '@/components/primitives';
 import { fmtDate, inr, MONTHS, parseISO, todayISO } from '@/lib/format';
 import { balanceOf, payState, SLOT_LABEL, useStore, type Booking, type PayState } from '@/lib/store';
@@ -38,14 +36,6 @@ const SORT_CHIPS: { key: SortKey; label: string; icon: MciName; desc: boolean }[
 /** Text/icon colour of the active (gold) sort chip. */
 const SORT_ON_FG = '#6B4A1A';
 
-const SORT_OPTIONS: { sort: Sort; label: string; sub: string }[] = [
-  { sort: { key: 'event', desc: false }, label: 'Event date', sub: 'Soonest first' },
-  { sort: { key: 'event', desc: true }, label: 'Event date', sub: 'Latest first' },
-  { sort: { key: 'booked', desc: true }, label: 'Booked on', sub: 'Most recently booked first' },
-  { sort: { key: 'name', desc: false }, label: 'Customer name', sub: 'A to Z' },
-  { sort: { key: 'amount', desc: true }, label: 'Amount', sub: 'Highest first' },
-];
-
 const EMPTY: Record<Filter, string> = {
   upcoming: 'No upcoming bookings',
   unpaid: 'Everything is paid up',
@@ -63,7 +53,6 @@ export default function BookingsScreen() {
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<Filter>(params.filter ?? 'all');
   const [sort, setSort] = useState<Sort>({ key: 'amount', desc: true });
-  const [sortSheet, setSortSheet] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const today = todayISO();
 
@@ -125,6 +114,8 @@ export default function BookingsScreen() {
   return (
     <View style={st.screen}>
       {focused ? <StatusBar style="light" /> : null}
+      {/* Header stays pinned; only the content below it scrolls. */}
+      <CompactBrandHeader topInset={insets.top} />
       <ScrollView
         contentContainerStyle={st.content}
         keyboardShouldPersistTaps="handled"
@@ -134,13 +125,6 @@ export default function BookingsScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} colors={[C.primary]} />
           ) : undefined
         }>
-        {/* Faint gold floral peeking in from the lower page edge. */}
-        <View style={[st.floral, { top: 640, left: -80 }]} pointerEvents="none">
-          <Mandala size={170} color={C.accent} opacity={0.16} />
-        </View>
-
-        <CompactBrandHeader topInset={insets.top} />
-
         <View style={st.sheet}>
           <View style={st.titleRow}>
             <View style={{ flex: 1 }}>
@@ -175,14 +159,6 @@ export default function BookingsScreen() {
                 </Touchable>
               ) : null}
             </View>
-            <Touchable
-              onPress={() => setSortSheet(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Sort options"
-              hitSlop={4}
-              style={st.filterBtn}>
-              <MaterialCommunityIcons name="tune-variant" size={20} color={C.primary} />
-            </Touchable>
           </View>
 
           <View style={st.tabs}>
@@ -237,7 +213,7 @@ export default function BookingsScreen() {
             })}
           </ScrollView>
 
-          <View style={{ gap: 7 }}>
+          <View style={{ gap: 10 }}>
             {list.length === 0 ? (
               <EmptyState
                 icon={query ? 'search-outline' : 'receipt-outline'}
@@ -250,21 +226,6 @@ export default function BookingsScreen() {
           </View>
         </View>
       </ScrollView>
-
-      <BottomSheet visible={sortSheet} onClose={() => setSortSheet(false)} title="Sort bookings">
-        {SORT_OPTIONS.map((o) => (
-          <OptionCard
-            key={`${o.sort.key}-${o.sort.desc}`}
-            title={o.label}
-            subtitle={o.sub}
-            selected={sort.key === o.sort.key && sort.desc === o.sort.desc}
-            onPress={() => {
-              setSort(o.sort);
-              setSortSheet(false);
-            }}
-          />
-        ))}
-      </BottomSheet>
     </View>
   );
 }
@@ -354,19 +315,14 @@ function BookingRow({ booking }: { booking: Booking }) {
 const st = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.bg },
   content: { paddingHorizontal: 14, paddingBottom: 24 },
-  floral: { position: 'absolute' },
 
-  /** Ivory sheet holding the title, search, filters and the booking list. */
+  /** Title, search, filters and the booking list, laid straight on the page. */
   sheet: {
     marginTop: 6,
-    backgroundColor: '#FFFCF9',
-    borderRadius: 22,
-    paddingHorizontal: 8,
-    paddingTop: 10,
-    paddingBottom: 10,
-    ...elevation,
+    paddingTop: 14,
+    paddingBottom: 14,
   },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 6, marginBottom: 10 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 6, marginBottom: 12 },
   title: { fontFamily: F.serifBold, fontSize: 33, lineHeight: 37, color: C.primary },
   subtitle: { fontFamily: F.regular, fontSize: 11.5, color: C.textSecondary, marginTop: -1 },
   addBtn: {
@@ -381,7 +337,7 @@ const st = StyleSheet.create({
   },
   addText: { fontFamily: F.semibold, fontSize: 13.5, color: C.onPrimary },
 
-  searchRow: { flexDirection: 'row', gap: 6, marginBottom: 10 },
+  searchRow: { flexDirection: 'row', gap: 6, marginBottom: 12 },
   search: {
     flex: 1,
     flexDirection: 'row',
@@ -397,18 +353,6 @@ const st = StyleSheet.create({
     shadowOpacity: 0.04,
   },
   searchInput: { flex: 1, fontFamily: F.regular, fontSize: 12.5, color: C.text, paddingVertical: 0, height: '100%' },
-  filterBtn: {
-    width: 44,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: '#EDE5DE',
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...elevation,
-    shadowOpacity: 0.04,
-  },
 
   tabs: {
     flexDirection: 'row',
@@ -417,7 +361,7 @@ const st = StyleSheet.create({
     backgroundColor: '#F7F2ED',
     borderWidth: 1,
     borderColor: '#EFE7E0',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   tabSlot: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   tab: {
@@ -443,8 +387,8 @@ const st = StyleSheet.create({
   tabTextOn: { fontFamily: F.medium, color: C.onPrimary },
   tabDivider: { width: 1, height: 16, backgroundColor: '#E3D9D0' },
 
-  chipsScroll: { marginHorizontal: -8, marginBottom: 10 },
-  chips: { flexGrow: 1, gap: 4, paddingHorizontal: 8 },
+  chipsScroll: { marginHorizontal: -14, marginBottom: 12 },
+  chips: { flexGrow: 1, gap: 4, paddingHorizontal: 14 },
   chip: {
     flexGrow: 1,
     flexDirection: 'row',
@@ -465,9 +409,9 @@ const st = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 11,
-    paddingVertical: 8,
-    paddingLeft: 9,
-    paddingRight: 8,
+    paddingVertical: 13,
+    paddingLeft: 12,
+    paddingRight: 9,
     borderRadius: 12,
     backgroundColor: C.surface,
     borderWidth: 1,

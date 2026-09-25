@@ -52,6 +52,9 @@ function TabLabel({ focused, color, children }: { focused: boolean; color: Color
   );
 }
 
+/** Home is listed third so it sits mid-bar, but it stays the tab the app opens on and returns to. */
+export const unstable_settings = { initialRouteName: 'index' };
+
 export default function TabsLayout() {
   const { signedIn } = useStore();
   const insets = useSafeAreaInsets();
@@ -71,7 +74,6 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: C.bg },
         animation: 'shift',
       }}>
-      <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: tabIcon('home-outline', 'home') }} />
       <Tabs.Screen
         name="calendar"
         options={{ title: 'Calendar', tabBarIcon: CalendarIcon }}
@@ -80,6 +82,7 @@ export default function TabsLayout() {
         name="bookings"
         options={{ title: 'Bookings', tabBarIcon: tabIcon('document-text-outline', 'document-text') }}
       />
+      <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: tabIcon('home-outline', 'home') }} />
       <Tabs.Screen
         name="customers"
         options={{ title: 'Customers', tabBarIcon: CustomersIcon }}
@@ -106,7 +109,14 @@ const st = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     elevation: 6,
   },
-  item: { borderRadius: 12, marginHorizontal: 2, paddingTop: 6, paddingBottom: 0, overflow: 'hidden' },
+  item: {
+    borderRadius: 12,
+    marginHorizontal: 2,
+    paddingTop: 0,
+    paddingBottom: 0,
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
   icon: { marginBottom: 0 },
   labelWrap: { alignItems: 'center', marginTop: 2 },
   label: { fontFamily: F.medium, fontSize: 11, lineHeight: 14 },

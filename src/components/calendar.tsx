@@ -51,18 +51,35 @@ const KIND_BG: Record<DateType, string> = {
   holiday: D.holiday.bg,
 };
 
-export function MonthHeader({ ym, onChange }: { ym: YM; onChange: (v: YM) => void }) {
+export function MonthHeader({ ym, onChange, boxed }: { ym: YM; onChange: (v: YM) => void; boxed?: boolean }) {
   const [picker, setPicker] = useState(false);
+  const nav = (dir: -1 | 1) =>
+    boxed ? (
+      <Touchable
+        onPress={() => onChange(shiftMonth(ym, dir))}
+        accessibilityLabel={dir < 0 ? 'Previous month' : 'Next month'}
+        hitSlop={6}
+        style={st.navBoxed}>
+        <Ionicons name={dir < 0 ? 'chevron-back' : 'chevron-forward'} size={18} color={C.text} />
+      </Touchable>
+    ) : (
+      <IconButton
+        icon={dir < 0 ? 'chevron-back' : 'chevron-forward'}
+        size={40}
+        onPress={() => onChange(shiftMonth(ym, dir))}
+        accessibilityLabel={dir < 0 ? 'Previous month' : 'Next month'}
+      />
+    );
   return (
     <View style={st.monthRow}>
-      <IconButton icon="chevron-back" size={40} onPress={() => onChange(shiftMonth(ym, -1))} accessibilityLabel="Previous month" />
+      {nav(-1)}
       <Touchable style={st.monthTitle} onPress={() => setPicker(true)} accessibilityLabel="Choose month">
-        <Text style={[T.section, { fontSize: 18 }]}>
+        <Text style={boxed ? st.monthBoxed : [T.section, { fontSize: 18 }]}>
           {MONTHS[ym.m]} {ym.y}
         </Text>
-        <Ionicons name="chevron-down" size={16} color={C.textSecondary} />
+        <Ionicons name="chevron-down" size={16} color={boxed ? C.primary : C.textSecondary} />
       </Touchable>
-      <IconButton icon="chevron-forward" size={40} onPress={() => onChange(shiftMonth(ym, 1))} accessibilityLabel="Next month" />
+      {nav(1)}
       <MonthPicker
         key={String(picker)}
         visible={picker}
@@ -88,6 +105,7 @@ export function CalendarGrid({
   isDisabled,
   showIndicators = true,
   excludeId,
+  boxed,
 }: {
   ym: YM;
   selected?: string | null;
@@ -95,6 +113,8 @@ export function CalendarGrid({
   isDisabled?: (iso: string) => boolean;
   showIndicators?: boolean;
   excludeId?: string;
+  /** Bordered day tiles with the dot inside, as in the booking date sheet. */
+  boxed?: boolean;
 }) {
   const { typesFor } = useStore();
   const availability = useDayAvailability();
@@ -120,7 +140,7 @@ export function CalendarGrid({
       {Array.from({ length: cells.length / 7 }, (_, r) => (
         <View key={r} style={st.row}>
           {cells.slice(r * 7, r * 7 + 7).map((iso, i) => {
-            if (!iso) return <View key={i} style={st.cell} />;
+            if (!iso) return <View key={i} style={boxed ? st.cellBoxed : st.cell} />;
             const types = typesFor(iso);
             const kind: DateType | null = types.includes('muhurtham')
               ? 'muhurtham'
@@ -135,6 +155,40 @@ export function CalendarGrid({
             const disabled = isDisabled?.(iso) ?? false;
             const isSel = selected === iso;
             const isToday = iso === today;
+            if (boxed) {
+              const muhurtham = kind === 'muhurtham' && showIndicators;
+              // Unavailable days keep their normal look (as in the design) but can't be tapped.
+              const Cell = disabled ? View : Touchable;
+              return (
+                <Cell
+                  key={iso}
+                  style={st.cellBoxed}
+                  onPress={() => onSelect(iso)}
+                  accessibilityLabel={iso}
+                  accessibilityState={{ selected: isSel, disabled }}>
+                  <View
+                    style={[
+                      st.tile,
+                      kind && showIndicators && { backgroundColor: KIND_BG[kind], borderColor: KIND_BG[kind] },
+                      isToday && st.tileToday,
+                      isSel && st.tileSelected,
+                    ]}>
+                    <Text
+                      style={[
+                        st.tileText,
+                        muhurtham && { color: C.accent },
+                        avail === 'blocked' && st.strike,
+                        (isToday || isSel) && { fontFamily: F.bold },
+                        isToday && !isSel && { color: C.primary },
+                        isSel && { color: C.onPrimary },
+                      ]}>
+                      {parseISO(iso).getDate()}
+                    </Text>
+                    <View style={[st.tileDot, avail !== 'free' && { backgroundColor: isSel ? C.onPrimary : DOT[avail] }]} />
+                  </View>
+                </Cell>
+              );
+            }
             return (
               <Touchable
                 key={iso}
@@ -169,7 +223,7 @@ export function CalendarGrid({
   );
 }
 
-export function CalendarLegend() {
+export function CalendarLegend({ boxed }: { boxed?: boolean }) {
   const tints = [
     { c: D.muhurtham.bg, l: 'Muhurtham', square: true },
     { c: D.valarpirai.bg, l: 'Valarpirai', square: true },
@@ -180,9 +234,9 @@ export function CalendarLegend() {
     { c: S.blocked, l: 'Blocked' },
   ];
   return (
-    <View style={st.legend}>
+    <View style={boxed ? st.legendBoxed : st.legend}>
       {tints.map((t) => (
-        <View key={t.l} style={st.legendItem}>
+        <View key={t.l} style={[st.legendItem, boxed && st.legendItemBoxed]}>
           <View
             style={
               t.square
@@ -190,7 +244,7 @@ export function CalendarLegend() {
                 : { width: 7, height: 7, borderRadius: 4, backgroundColor: t.c }
             }
           />
-          <Text style={T.caption}>{t.l}</Text>
+          <Text style={boxed ? st.legendText : T.caption}>{t.l}</Text>
         </View>
       ))}
     </View>
@@ -259,6 +313,48 @@ const st = StyleSheet.create({
   dot: { width: 5, height: 5, borderRadius: 3, marginTop: 3 },
   legend: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 14, rowGap: 8, marginTop: 12 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendBoxed: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: 8,
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#ECE3DA',
+    backgroundColor: C.surface,
+  },
+  legendItemBoxed: { width: '25%' },
+  legendText: { fontFamily: F.regular, fontSize: 10.5, color: C.textSecondary },
+
+  navBoxed: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: '#ECE3DA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0px 1px 3px rgba(87, 21, 44, 0.08)',
+  },
+  monthBoxed: { fontFamily: F.pageSerifBold, fontSize: 19, lineHeight: 24, color: C.primary },
+  cellBoxed: { flex: 1, paddingHorizontal: 3, paddingVertical: 3 },
+  tile: {
+    height: 38,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#EDE5DD',
+    backgroundColor: C.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 3,
+  },
+  tileToday: { borderWidth: 1.5, borderColor: C.primary, backgroundColor: C.surface },
+  tileSelected: { backgroundColor: C.primary, borderColor: C.primary, boxShadow: '0px 2px 5px rgba(87, 21, 44, 0.3)' },
+  tileText: { fontFamily: F.regular, fontSize: 13.5, lineHeight: 17, color: C.text },
+  tileDot: { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
   pickerYear: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   monthGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   monthCell: {

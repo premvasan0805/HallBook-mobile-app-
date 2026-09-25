@@ -106,6 +106,9 @@ export const F = {
   serifSemibold: 'CormorantGaramond_600SemiBold',
   serifBold: 'CormorantGaramond_700Bold',
   serifItalic: 'CormorantGaramond_500Medium_Italic',
+  /** Text serif for page-header titles. */
+  pageSerif: 'PTSerif_400Regular',
+  pageSerifBold: 'PTSerif_700Bold',
 };
 
 export const T = StyleSheet.create({

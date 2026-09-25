@@ -5,19 +5,17 @@ import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { ClipPath, Defs, Image as SvgImage, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
+import { PhotoBrandHeader } from '@/components/brand-header';
 import { openBooking } from '@/components/cards';
 import { CalendarBoard, DayDetail } from '@/components/calendar-board';
 import { currentYM, type YM } from '@/components/calendar';
 import { BrandGradient, Lotus } from '@/components/decor';
 import { ConfirmDialog, useToast } from '@/components/overlays';
 import { Touchable } from '@/components/primitives';
-import { fmtFull, initials, parseISO, todayISO } from '@/lib/format';
+import { fmtFull, parseISO, todayISO } from '@/lib/format';
 import { useStore } from '@/lib/store';
 import { C, elevation, F } from '@/lib/theme';
-
-const VENUE = require('../../../assets/images/home/venue.png');
 
 export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
@@ -41,9 +39,9 @@ export default function CalendarScreen() {
   return (
     <View style={st.screen}>
       {focused ? <StatusBar style="light" /> : null}
+      {/* Header stays pinned; only the content below it scrolls. */}
+      <PhotoBrandHeader topInset={insets.top} />
       <ScrollView contentContainerStyle={st.content} showsVerticalScrollIndicator={false}>
-        <BrandHeader topInset={insets.top} />
-
         <View style={st.card}>
           <View style={st.titleRow}>
             <View>
@@ -92,83 +90,8 @@ export default function CalendarScreen() {
   );
 }
 
-/** Photo's left edge inside a w×h box: sweeps out from the top and opens toward the bottom. */
-const photoEdge = (w: number, h: number) => `M${w * 0.26} 0C${w * 0.04} ${h * 0.3} ${w * 0.3} ${h * 0.7} ${w * 0.44} ${h}`;
-
-function BrandHeader({ topInset }: { topInset: number }) {
-  const { hall, bookings } = useStore();
-  const [size, setSize] = useState({ w: 0, h: 0 });
-  const today = todayISO();
-  const hasUpcoming = bookings.some((b) => b.status !== 'cancelled' && b.date >= today);
-  const pw = size.w * 0.62;
-  const edge = photoEdge(pw, size.h);
-
-  return (
-    <View
-      style={[st.header, { paddingTop: topInset + 14 }]}
-      onLayout={(e) => setSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
-      {size.w > 0 ? (
-        <View style={[st.photo, { width: pw, height: size.h }]} pointerEvents="none">
-          <Svg width={pw} height={size.h}>
-            <Defs>
-              <ClipPath id="calHeaderClip">
-                <Path d={`${edge}L${pw} ${size.h}L${pw} 0Z`} />
-              </ClipPath>
-              <LinearGradient id="calHeaderShade" x1="0" y1="0" x2="1" y2="0">
-                <Stop offset="0.2" stopColor={C.primaryDark} stopOpacity={0.55} />
-                <Stop offset="0.5" stopColor={C.primaryDark} stopOpacity={0} />
-                <Stop offset="0.72" stopColor={C.primaryDark} stopOpacity={0.35} />
-                <Stop offset="1" stopColor={C.primaryDark} stopOpacity={0.9} />
-              </LinearGradient>
-            </Defs>
-            <SvgImage
-              href={VENUE}
-              width={pw}
-              height={size.h}
-              preserveAspectRatio="xMidYMid slice"
-              clipPath="url(#calHeaderClip)"
-            />
-            <Rect width={pw} height={size.h} fill="url(#calHeaderShade)" clipPath="url(#calHeaderClip)" />
-            <Path d={edge} fill="none" stroke={C.accentOnPrimary} strokeOpacity={0.6} strokeWidth={1.5} />
-          </Svg>
-        </View>
-      ) : null}
-
-      <View style={{ flex: 1 }}>
-        <Text style={st.brand}>
-          Hall<Text style={{ color: C.accentOnPrimary }}>Book</Text>
-        </Text>
-        <Touchable onPress={() => router.push('/settings/hall')} accessibilityLabel="Hall details" style={st.hallRow}>
-          <MaterialCommunityIcons name="bank-outline" size={19} color={C.accentOnPrimary} />
-          <Text style={st.hallName} numberOfLines={1}>
-            {hall.name}
-          </Text>
-          <Ionicons name="chevron-down" size={14} color={C.onPrimary} />
-        </Touchable>
-        <Text style={st.motto}>Celebrate Beautiful Beginnings</Text>
-      </View>
-
-      <View style={{ alignItems: 'flex-end' }}>
-        <View style={st.headerIcons}>
-          <Touchable
-            onPress={() => router.push('/settings/notifications')}
-            accessibilityLabel="Notifications"
-            hitSlop={6}
-            style={st.bell}>
-            <Ionicons name="notifications" size={23} color={C.onPrimary} />
-            {hasUpcoming ? <View style={st.bellDot} /> : null}
-          </Touchable>
-          <Touchable onPress={() => router.push('/more')} accessibilityLabel="Profile" style={st.avatar}>
-            <Text style={st.avatarText}>{initials(hall.role)}</Text>
-          </Touchable>
-        </View>
-        <Text style={st.quote}>
-          “Great Events{'\n'}Create Lasting{'\n'}— Memories”
-        </Text>
-      </View>
-    </View>
-  );
-}
+/** Burgundy used for the Block Date outline, icon and label. */
+const BLOCK_FG = '#7A1432';
 
 function DayActions({ iso }: { iso: string }) {
   const { bookingsOn, segmentState, blockedDays, toggleBlock } = useStore();
@@ -177,25 +100,32 @@ function DayActions({ iso }: { iso: string }) {
   const list = bookingsOn(iso);
   const blocked = blockedDays.includes(iso);
   const anyFree = Object.values(segmentState(iso)).some((s) => s === 'free');
+  // Same 1392px-wide reference as the day card above, so both scale together.
+  const [rowWidth, setRowWidth] = useState(0);
+  const u = (px: number) => (rowWidth / 1392) * px;
+  const btn = { height: u(138), borderRadius: u(22) };
+  const label = { fontSize: u(62), lineHeight: u(74) };
 
   return (
     <>
-      <View style={st.actions}>
+      <View style={[st.actions, { gap: u(24) }]} onLayout={(e) => setRowWidth(e.nativeEvent.layout.width)}>
         <Touchable
           onPress={() => router.push({ pathname: '/booking/new', params: { date: iso } })}
           disabled={blocked || !anyFree}
           accessibilityRole="button"
-          style={[st.actionBtn, st.addBtn]}>
-          <BrandGradient id="addBookingGrad" from={C.gradientTo} to={C.primaryDark} />
-          <Ionicons name="add" size={22} color={C.onPrimary} />
-          <Text style={[st.actionText, { color: C.onPrimary }]}>Add Booking</Text>
+          hitSlop={6}
+          style={[st.actionBtn, st.addBtn, btn, { gap: u(48) }]}>
+          <BrandGradient id="addBookingGrad" from="#9A2244" to="#6A0B2D" />
+          <Ionicons name="add" size={u(84)} color={C.onPrimary} />
+          <Text style={[st.actionText, label, { color: C.onPrimary }]}>Add Booking</Text>
         </Touchable>
         <Touchable
           onPress={() => (blocked ? (toggleBlock(iso), toast('Date unblocked')) : setConfirm(true))}
           accessibilityRole="button"
-          style={[st.actionBtn, st.blockBtn]}>
-          <Ionicons name={blocked ? 'lock-open-outline' : 'lock-closed-outline'} size={19} color={C.primary} />
-          <Text style={[st.actionText, { color: C.primary }]}>{blocked ? 'Unblock' : 'Block Date'}</Text>
+          hitSlop={6}
+          style={[st.actionBtn, st.blockBtn, btn, { gap: u(46) }]}>
+          <Ionicons name={blocked ? 'lock-open-outline' : 'lock-closed-outline'} size={u(68)} color={BLOCK_FG} />
+          <Text style={[st.actionText, label, { color: BLOCK_FG }]}>{blocked ? 'Unblock' : 'Block Date'}</Text>
         </Touchable>
       </View>
 
@@ -223,71 +153,12 @@ const st = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.bg },
   content: { paddingHorizontal: 14, paddingBottom: 24 },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: C.primary,
-    marginHorizontal: -14,
-    marginBottom: -30,
-    paddingHorizontal: 22,
-    paddingBottom: 44,
-    borderBottomRightRadius: 40,
-    overflow: 'hidden',
-  },
-  photo: { position: 'absolute', right: 0, top: 0 },
-  brand: { fontFamily: F.serifBold, fontSize: 38, lineHeight: 42, color: C.onPrimary },
-  hallRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 1, alignSelf: 'flex-start' },
-  hallName: { fontFamily: F.serifSemibold, fontSize: 17, color: C.onPrimary, flexShrink: 1 },
-  motto: {
-    fontFamily: F.medium,
-    fontSize: 9.5,
-    letterSpacing: 1.9,
-    color: C.accentOnPrimary,
-    marginTop: 7,
-  },
-  headerIcons: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  bell: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  bellDot: {
-    position: 'absolute',
-    top: 3,
-    right: 4,
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-    backgroundColor: '#E5283A',
-    borderWidth: 1.5,
-    borderColor: C.onPrimary,
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#C49468',
-    borderWidth: 2.5,
-    borderColor: '#F0D9B5',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { fontFamily: F.medium, fontSize: 19, color: C.onPrimary },
-  quote: {
-    fontFamily: F.serifItalic,
-    fontSize: 13.5,
-    lineHeight: 15,
-    color: C.accentOnPrimary,
-    textAlign: 'right',
-    marginTop: 8,
-  },
-
-  /** One ivory sheet holding the title, month board, selected day and actions. */
+  /** Title, month board, selected day and actions, laid straight on the page. */
   card: {
-    backgroundColor: '#FFFCF9',
-    borderRadius: 22,
-    paddingHorizontal: 5,
-    paddingTop: 10,
-    paddingBottom: 10,
-    ...elevation,
+    paddingTop: 16,
+    paddingBottom: 14,
   },
-  titleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, paddingLeft: 20, paddingRight: 4 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, paddingLeft: 4, paddingRight: 0 },
   title: { fontFamily: F.serifBold, fontSize: 33, lineHeight: 36, color: C.primary },
   subtitle: { fontFamily: F.regular, fontSize: 10.5, letterSpacing: 1.4, color: C.textSecondary, marginTop: -1 },
   flourish: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, paddingHorizontal: 6 },
@@ -307,18 +178,15 @@ const st = StyleSheet.create({
   },
   todayText: { fontFamily: F.semibold, fontSize: 12.5, color: C.primary },
 
-  dayBlock: { gap: 8, marginTop: 6 },
-  actions: { flexDirection: 'row', gap: 6 },
+  dayBlock: { gap: 6, marginTop: 12 },
+  actions: { flexDirection: 'row' },
   actionBtn: {
-    height: 44,
-    borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
     overflow: 'hidden',
   },
-  addBtn: { flex: 1.7, ...elevation },
-  blockBtn: { flex: 1, backgroundColor: C.surface, borderWidth: 1.2, borderColor: C.primary },
-  actionText: { fontFamily: F.semibold, fontSize: 14, color: C.primary },
+  addBtn: { flex: 821, boxShadow: '0px 3px 8px rgba(87, 21, 44, 0.25)' },
+  blockBtn: { flex: 547, backgroundColor: C.surface, borderWidth: 1.5, borderColor: '#8E1535' },
+  actionText: { fontFamily: F.pageSerifBold },
 });

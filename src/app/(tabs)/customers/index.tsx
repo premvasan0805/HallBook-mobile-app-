@@ -6,9 +6,7 @@ import { Linking, Platform, RefreshControl, ScrollView, StyleSheet, Text, TextIn
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CompactBrandHeader } from '@/components/brand-header';
-import { BrandGradient, Mandala } from '@/components/decor';
-import { OptionCard } from '@/components/form';
-import { BottomSheet } from '@/components/overlays';
+import { BrandGradient } from '@/components/decor';
 import { EmptyState, Touchable } from '@/components/primitives';
 import { CustomerFormSheet } from '@/components/sheets';
 import { initials, todayISO } from '@/lib/format';
@@ -17,19 +15,6 @@ import { C, elevation, F, noOutline } from '@/lib/theme';
 
 /** Profiles open inside this tab's stack so the tab bar stays visible. */
 const openCustomer = (id: string) => router.push({ pathname: '/customers/[id]', params: { id } });
-
-type Show = 'all' | 'active' | 'inactive';
-type Sort = 'name' | 'bookings';
-
-const SHOW_OPTIONS: { key: Show; label: string; sub: string }[] = [
-  { key: 'all', label: 'All customers', sub: 'Everyone in your list' },
-  { key: 'active', label: 'Active', sub: 'Has an upcoming booking' },
-  { key: 'inactive', label: 'Inactive', sub: 'No upcoming booking' },
-];
-const SORT_OPTIONS: { key: Sort; label: string; sub: string }[] = [
-  { key: 'name', label: 'Name', sub: 'A to Z' },
-  { key: 'bookings', label: 'Most bookings', sub: 'Regulars first' },
-];
 
 /** Pastel initials circles; picked from the name so a customer keeps their colour. */
 const AVATAR = [
@@ -46,9 +31,6 @@ export default function CustomersScreen() {
   const [focused, setFocused] = useState(false);
   const [q, setQ] = useState('');
   const [adding, setAdding] = useState(false);
-  const [optionsSheet, setOptionsSheet] = useState(false);
-  const [show, setShow] = useState<Show>('all');
-  const [sort, setSort] = useState<Sort>('name');
   const [refreshing, setRefreshing] = useState(false);
   const today = todayISO();
 
@@ -67,8 +49,7 @@ export default function CustomersScreen() {
   const query = q.trim().toLowerCase();
   const list = customers
     .filter((c) => !query || c.name.toLowerCase().includes(query) || c.phone.includes(query))
-    .filter((c) => show === 'all' || (show === 'active') === isActive(c.id))
-    .sort((a, b) => (sort === 'bookings' ? countFor(b.id) - countFor(a.id) : 0) || a.name.localeCompare(b.name));
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -79,6 +60,8 @@ export default function CustomersScreen() {
   return (
     <View style={st.screen}>
       {focused ? <StatusBar style="light" /> : null}
+      {/* Header stays pinned; only the content below it scrolls. */}
+      <CompactBrandHeader topInset={insets.top} />
       <ScrollView
         contentContainerStyle={st.content}
         keyboardShouldPersistTaps="handled"
@@ -88,16 +71,6 @@ export default function CustomersScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} colors={[C.primary]} />
           ) : undefined
         }>
-        {/* Faint gold florals peeking in from the page corners beside the header. */}
-        <View style={[st.floral, { top: 40, left: -90 }]} pointerEvents="none">
-          <Mandala size={170} color={C.accent} opacity={0.14} />
-        </View>
-        <View style={[st.floral, { top: 40, right: -90 }]} pointerEvents="none">
-          <Mandala size={170} color={C.accent} opacity={0.14} />
-        </View>
-
-        <CompactBrandHeader topInset={insets.top} />
-
         <View style={st.sheet}>
           <View style={st.titleRow}>
             <View style={{ flex: 1 }}>
@@ -128,24 +101,15 @@ export default function CustomersScreen() {
                 </Touchable>
               ) : null}
             </View>
-            <Touchable
-              onPress={() => setOptionsSheet(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Filter and sort"
-              hitSlop={4}
-              style={st.filterBtn}>
-              <MaterialCommunityIcons name="tune-variant" size={20} color={C.primary} />
-              {show !== 'all' || sort !== 'name' ? <View style={st.filterDot} /> : null}
-            </Touchable>
           </View>
 
           <View style={{ gap: 9 }}>
             {list.length === 0 ? (
-              query || show !== 'all' ? (
+              query ? (
                 <EmptyState
                   icon="search-outline"
                   title="No matches"
-                  message={query ? `Nothing found for “${q}”.` : 'No customers in this filter.'}
+                  message={`Nothing found for “${q}”.`}
                 />
               ) : (
                 <EmptyState
@@ -161,35 +125,6 @@ export default function CustomersScreen() {
           </View>
         </View>
       </ScrollView>
-
-      <BottomSheet visible={optionsSheet} onClose={() => setOptionsSheet(false)} title="Filter & sort">
-        <Text style={st.sheetHeading}>Show</Text>
-        {SHOW_OPTIONS.map((o) => (
-          <OptionCard
-            key={o.key}
-            title={o.label}
-            subtitle={o.sub}
-            selected={show === o.key}
-            onPress={() => {
-              setShow(o.key);
-              setOptionsSheet(false);
-            }}
-          />
-        ))}
-        <Text style={st.sheetHeading}>Sort by</Text>
-        {SORT_OPTIONS.map((o) => (
-          <OptionCard
-            key={o.key}
-            title={o.label}
-            subtitle={o.sub}
-            selected={sort === o.key}
-            onPress={() => {
-              setSort(o.key);
-              setOptionsSheet(false);
-            }}
-          />
-        ))}
-      </BottomSheet>
 
       <CustomerFormSheet visible={adding} onClose={() => setAdding(false)} onSaved={(c) => openCustomer(c.id)} />
     </View>
@@ -262,17 +197,12 @@ const INACTIVE_FG = '#9A6512';
 const st = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.bg },
   content: { paddingHorizontal: 14, paddingBottom: 24 },
-  floral: { position: 'absolute' },
 
-  /** Ivory sheet holding the title, search and the customer list. */
+  /** Title, search and the customer list, laid straight on the page. */
   sheet: {
     marginTop: 6,
-    backgroundColor: '#FFFCF9',
-    borderRadius: 22,
-    paddingHorizontal: 8,
-    paddingTop: 10,
-    paddingBottom: 10,
-    ...elevation,
+    paddingTop: 14,
+    paddingBottom: 14,
   },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 6, marginBottom: 10 },
   title: { fontFamily: F.serifBold, fontSize: 33, lineHeight: 37, color: C.primary },
@@ -305,27 +235,6 @@ const st = StyleSheet.create({
     shadowOpacity: 0.04,
   },
   searchInput: { flex: 1, fontFamily: F.regular, fontSize: 12.5, color: C.text, paddingVertical: 0, height: '100%' },
-  filterBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: '#EDE5DE',
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...elevation,
-    shadowOpacity: 0.04,
-  },
-  filterDot: {
-    position: 'absolute',
-    top: 7,
-    right: 7,
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: C.primary,
-  },
 
   row: {
     flexDirection: 'row',
@@ -368,13 +277,4 @@ const st = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  sheetHeading: {
-    fontFamily: F.semibold,
-    fontSize: 12,
-    letterSpacing: 0.6,
-    color: C.textSecondary,
-    textTransform: 'uppercase',
-    marginTop: 4,
-    marginBottom: -2,
-  },
 });

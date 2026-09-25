@@ -16,7 +16,7 @@ import {
 import { TextField } from '@/components/form';
 import { BottomSheet, useToast } from '@/components/overlays';
 import { PrimaryButton, Touchable } from '@/components/primitives';
-import { inr, toNum } from '@/lib/format';
+import { fmtClock, inr, toNum } from '@/lib/format';
 import {
   CATEGORY_LABEL,
   CATEGORY_ORDER,
@@ -32,7 +32,24 @@ import {
 } from '@/lib/store';
 import { C, elevation, F, noOutline, radius, T } from '@/lib/theme';
 
-const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+/** 12-hour clock time as typed in the timing sheet, e.g. 6:00 or 06:00. */
+const TIME_RE = /^(0?[1-9]|1[0-2]):[0-5]\d$/;
+
+type Meridiem = 'AM' | 'PM';
+
+/** Stored 24-hour "HH:MM" -> 12-hour text plus AM/PM for editing. */
+function to12(hhmm: string): { time: string; ap: Meridiem } {
+  const [h, m] = hhmm.split(':').map(Number);
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return { time: `${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')}`, ap: h >= 12 ? 'PM' : 'AM' };
+}
+
+/** 12-hour text plus AM/PM -> stored 24-hour "HH:MM". */
+function to24(time: string, ap: Meridiem) {
+  const [h, m] = time.split(':').map(Number);
+  const h24 = (h % 12) + (ap === 'PM' ? 12 : 0);
+  return `${String(h24).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
 
 const CAT_DOT: Record<Category, string> = {
   muhurthamWeekend: '#C8963E',
@@ -69,6 +86,8 @@ export default function PricingScreen() {
   const [editRate, setEditRate] = useState<Category | null>(null);
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
+  const [startAp, setStartAp] = useState<Meridiem>('AM');
+  const [endAp, setEndAp] = useState<Meridiem>('AM');
   const [nonGst, setNonGst] = useState('');
   const [gst, setGst] = useState('');
   const rateSplit = { nonGst: toNum(nonGst), gst: toNum(gst) };
@@ -123,14 +142,18 @@ export default function PricingScreen() {
                   accessibilityLabel={`Edit ${sg.label}`}
                   style={[st.row, i > 0 && st.rowRule]}
                   onPress={() => {
-                    setStart(sg.start);
-                    setEnd(sg.end);
+                    const a = to12(sg.start);
+                    const b = to12(sg.end);
+                    setStart(a.time);
+                    setStartAp(a.ap);
+                    setEnd(b.time);
+                    setEndAp(b.ap);
                     setEditSeg(sg);
                   }}>
                   <Bubble icon={m.icon} fg={m.fg} bg={m.bg} />
                   <Text style={st.rowLabel}>{sg.label}</Text>
                   <Text style={st.segTime}>
-                    {sg.start} – {sg.end}
+                    {fmtClock(sg.start)} – {fmtClock(sg.end)}
                   </Text>
                   <MaterialCommunityIcons name="square-edit-outline" size={20} color={C.primary} />
                 </Touchable>
@@ -190,36 +213,40 @@ export default function PricingScreen() {
         visible={!!editSeg}
         onClose={() => setEditSeg(null)}
         title={editSeg?.label}
-        subtitle="24-hour format, e.g. 06:00"
+        subtitle="Enter the time and choose AM or PM"
         footer={
           <PrimaryButton
             title="Save"
             disabled={!segValid}
             onPress={() => {
-              if (editSeg) updateSegment(editSeg.key, start, end);
+              if (editSeg) updateSegment(editSeg.key, to24(start, startAp), to24(end, endAp));
               setEditSeg(null);
               toast('Timing updated');
             }}
           />
         }>
         <View style={{ flexDirection: 'row', gap: 12 }}>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, gap: 8 }}>
             <TextField
               label="Start"
               value={start}
               onChangeText={setStart}
               placeholder="06:00"
-              error={start && !TIME_RE.test(start) ? 'HH:MM' : undefined}
+              keyboardType="numbers-and-punctuation"
+              error={start && !TIME_RE.test(start) ? 'HH:MM, 01–12' : undefined}
             />
+            <MeridiemToggle value={startAp} onChange={setStartAp} />
           </View>
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, gap: 8 }}>
             <TextField
               label="End"
               value={end}
               onChangeText={setEnd}
               placeholder="11:00"
-              error={end && !TIME_RE.test(end) ? 'HH:MM' : undefined}
+              keyboardType="numbers-and-punctuation"
+              error={end && !TIME_RE.test(end) ? 'HH:MM, 01–12' : undefined}
             />
+            <MeridiemToggle value={endAp} onChange={setEndAp} />
           </View>
         </View>
       </BottomSheet>
@@ -347,7 +374,39 @@ function Bubble({ icon, fg, bg }: { icon: keyof typeof MaterialCommunityIcons.gl
   );
 }
 
+/** AM / PM segmented switch under a time field. */
+function MeridiemToggle({ value, onChange }: { value: Meridiem; onChange: (v: Meridiem) => void }) {
+  return (
+    <View style={st.meridiem}>
+      {(['AM', 'PM'] as const).map((ap) => {
+        const on = value === ap;
+        return (
+          <Touchable
+            key={ap}
+            onPress={() => onChange(ap)}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: on }}
+            style={[st.meridiemItem, on && st.meridiemOn]}>
+            <Text style={[st.meridiemText, on && { color: C.onPrimary, fontFamily: F.semibold }]}>{ap}</Text>
+          </Touchable>
+        );
+      })}
+    </View>
+  );
+}
+
 const st = StyleSheet.create({
+  meridiem: {
+    flexDirection: 'row',
+    padding: 3,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.surface,
+  },
+  meridiemItem: { flex: 1, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  meridiemOn: { backgroundColor: C.primary },
+  meridiemText: { fontFamily: F.medium, fontSize: 14, color: C.text },
   screen: { flex: 1, backgroundColor: C.bg },
   body: { padding: 14, gap: 12, paddingBottom: 32 },
 
@@ -371,7 +430,7 @@ const st = StyleSheet.create({
   bubble: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   rowLabel: { flex: 1, fontFamily: F.semibold, fontSize: 14, color: C.text },
   rowTime: { fontFamily: F.regular, fontSize: 12.5, color: C.textSecondary },
-  segTime: { fontFamily: F.medium, fontSize: 13.5, color: C.text, fontVariant: ['tabular-nums'] },
+  segTime: { fontFamily: F.medium, fontSize: 12.5, color: C.text, fontVariant: ['tabular-nums'] },
 
   tabs: {
     flexDirection: 'row',

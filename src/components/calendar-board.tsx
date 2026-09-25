@@ -268,14 +268,36 @@ const STATE_PILL: Record<SegState, { label: string; fg: string; bg: string }> = 
   blocked: { label: 'Blocked', fg: S.blocked, bg: S.blockedSoft },
 };
 
-/**
- * Status pill and action sit side by side only when the slot label still gets ~100px;
- * narrower (most phones) they stack so the label and time stay readable.
- */
-const INLINE_MIN_WIDTH = 250;
-
-/** Grows the compact 28pt slot buttons to a 44pt touch target without changing their look. */
+/** Grows the slot buttons to a 44pt touch target without changing their look. */
 const BTN_SLOP = { top: 8, bottom: 8, left: 4, right: 4 };
+
+/**
+ * The selected-day card is laid out on a 1405px-wide reference; `u(px)` maps a reference pixel to dp
+ * so the card keeps the design's proportions at any width.
+ */
+const DAY_REF_W = 1405;
+const DATE_COL_W = 282;
+
+/** Colors traced from the day-card design. */
+const DAY = {
+  ink: '#1A1414',
+  muted: '#5A5563',
+  rate: '#7A0A2C',
+  gold: '#EFC56E',
+  goldLine: '#E6B762',
+  slotBorder: '#EFE5DA',
+  iconBox: '#FCF2E3',
+  icon: '#A96A22',
+  vacantBg: '#E6F3E8',
+  vacantFg: '#16592C',
+  leaf: '#4A6A1E',
+  chipFg: '#1E4F24',
+};
+
+/** Box top that puts a PT Serif line of size `fs` (line height 1.2·fs) on baseline `b`. */
+const serifTop = (b: number, fs: number) => b - 0.9765 * fs;
+/** Same for Inter. */
+const sansTop = (b: number, fs: number) => b - 0.963 * fs;
 
 export function DayDetail({
   iso,
@@ -287,134 +309,212 @@ export function DayDetail({
   onOpenBooking: (b: Booking) => void;
 }) {
   const { typesFor, segmentState, segments, categoryFor, priceFor, bookingsOn } = useStore();
-  const [bodyWidth, setBodyWidth] = useState(0);
+  const [cardWidth, setCardWidth] = useState(0);
   const d = parseISO(iso);
   const types = typesFor(iso);
   const phase = lunarPhase(types);
   const waxing = phase.key === 'valarpirai';
   const seg = segmentState(iso);
   const list = bookingsOn(iso);
-  const inline = bodyWidth >= INLINE_MIN_WIDTH;
+  const u = (px: number) => (cardWidth / DAY_REF_W) * px;
+  const serif = (b: number, fs: number, bold = true) => ({
+    top: u(serifTop(b, fs)),
+    fontFamily: bold ? F.pageSerifBold : F.pageSerif,
+    fontSize: u(fs),
+    lineHeight: u(fs * 1.2),
+  });
+  const tags = types.includes('muhurtham') || types.includes('special');
+  const tag = { height: u(64), borderRadius: u(32), gap: u(10), paddingHorizontal: u(28) };
+  const tagText = { fontSize: u(40), lineHeight: u(48) };
 
   return (
-    <View style={st.detail}>
-      <View style={st.dateCol}>
-        <BrandGradient id="dateColGrad" from={C.gradientTo} to={C.primaryDark} />
-        <View style={st.dateArt} pointerEvents="none">
-          <Image source={MANDAP_SCENE} style={st.dateArtImg} contentFit="contain" />
-        </View>
-        <Text style={st.dateNum}>{d.getDate()}</Text>
-        <Text style={st.dateMonth}>
-          {MONTHS[d.getMonth()].slice(0, 3).toUpperCase()} {d.getFullYear()}
-        </Text>
-        <Text style={st.dateWeekday}>{WEEKDAY_LONG[d.getDay()]}</Text>
-        {waxing ? (
-          <Ionicons name="leaf-outline" size={20} color="#8ED39C" style={{ marginTop: 8 }} />
-        ) : (
-          <MaterialCommunityIcons name="moon-waning-crescent" size={20} color="#A9C3EE" style={{ marginTop: 8 }} />
-        )}
-        <Text style={st.datePhase}>{phase.label}</Text>
-      </View>
+    <View style={[st.detail, { borderRadius: u(26) }]} onLayout={(e) => setCardWidth(e.nativeEvent.layout.width)}>
+      {cardWidth > 0 ? (
+        <>
+          {/* Date strip: day, month, weekday, moon phase, mandap line art */}
+          <View style={[st.dateCol, { width: u(DATE_COL_W) }]}>
+            <BrandGradient id="dateColGrad" from="#8A1535" to="#600A25" />
+            <Image
+              source={MANDAP_SCENE}
+              contentFit="contain"
+              pointerEvents="none"
+              style={{ position: 'absolute', left: -u(38), bottom: 0, width: u(358), height: u(251), opacity: 0.92 }}
+            />
+            <Text style={[st.colText, serif(183, 164), { color: C.onPrimary, fontVariant: ['lining-nums'] }]}>{d.getDate()}</Text>
+            <Text style={[st.colText, serif(251, 50), { color: DAY.gold, fontVariant: ['lining-nums'] }]}>
+              {MONTHS[d.getMonth()].slice(0, 3).toUpperCase()} {d.getFullYear()}
+            </Text>
+            <Text style={[st.colText, serif(313, 50), { color: C.onPrimary }]}>{WEEKDAY_LONG[d.getDay()]}</Text>
+            <View
+              style={{
+                position: 'absolute',
+                top: u(362),
+                left: u((DATE_COL_W - 97) / 2),
+                width: u(97),
+                height: Math.max(u(4), 1),
+                backgroundColor: DAY.goldLine,
+              }}
+            />
+            <View style={[st.colIcon, { top: u(404), height: u(80) }]}>
+              {waxing ? (
+                <Ionicons name="leaf-outline" size={u(72)} color={DAY.gold} />
+              ) : (
+                <MaterialCommunityIcons name="moon-waning-crescent" size={u(72)} color={DAY.gold} />
+              )}
+            </View>
+            <Text style={[st.colText, serif(521, 47), { color: C.onPrimary }]}>{phase.label}</Text>
+          </View>
 
-      <View style={st.detailBody} onLayout={(e) => setBodyWidth(e.nativeEvent.layout.width)}>
-        <View style={st.detailHead}>
-          <Text style={st.detailTitle}>{fmtFull(iso)}</Text>
-          <View style={[st.chip, !waxing && { backgroundColor: D.theipirai.bg }]}>
-            {waxing ? (
-              <Ionicons name="leaf-outline" size={14} color={LEAF_FG} />
-            ) : (
-              <MaterialCommunityIcons name="moon-waning-crescent" size={14} color={MOON_FG} />
-            )}
-            <Text style={[st.chipText, !waxing && { color: D.theipirai.fg }]}>{phase.label}</Text>
-          </View>
-        </View>
-        <View style={st.subRow}>
-          <Text style={st.subText}>
-            {list.length === 0 ? 'No bookings' : `${list.length} booking${list.length > 1 ? 's' : ''}`}
-          </Text>
-          <View style={st.rate}>
-            <Text style={st.subText}>{CATEGORY_LABEL[categoryFor(iso)]} rate</Text>
-            <Text style={st.rateValue}>{inr(priceFor(iso, 'full'))}</Text>
-          </View>
-        </View>
-        {types.includes('muhurtham') || types.includes('special') ? (
-          <View style={st.tagRow}>
-            {types.includes('muhurtham') ? (
-              <View style={[st.chip, { backgroundColor: D.muhurtham.bg }]}>
-                <Ionicons name="star" size={12} color={C.accent} />
-                <Text style={[st.chipText, { color: D.muhurtham.fg }]}>Muhurtham</Text>
+          <View style={{ flex: 1, paddingLeft: u(31), paddingRight: u(34), paddingBottom: u(40) }}>
+            {/* Title, phase chip, booking count and rate */}
+            <View style={{ height: u(218) }}>
+              <Text
+                numberOfLines={1}
+                style={[st.abs, serif(103, 71), { left: u(11), right: u(330), color: DAY.ink, fontVariant: ['lining-nums'] }]}>
+                {fmtFull(iso)}
+              </Text>
+              <View
+                style={[
+                  st.abs,
+                  st.chip,
+                  { top: u(35), right: u(3), width: u(290), height: u(73), borderRadius: u(37), gap: u(14) },
+                  !waxing && { backgroundColor: D.theipirai.bg },
+                ]}>
+                {waxing ? (
+                  <Ionicons name="leaf-outline" size={u(50)} color={DAY.leaf} />
+                ) : (
+                  <MaterialCommunityIcons name="moon-waning-crescent" size={u(50)} color={MOON_FG} />
+                )}
+                <Text style={{ fontFamily: F.pageSerif, fontSize: u(43), lineHeight: u(52), color: waxing ? DAY.chipFg : D.theipirai.fg }}>
+                  {phase.label}
+                </Text>
               </View>
-            ) : null}
-            {types.includes('special') ? (
-              <View style={[st.chip, { backgroundColor: TINT.special }]}>
-                <MaterialCommunityIcons name="asterisk" size={12} color={SPECIAL_FG} />
-                <Text style={[st.chipText, { color: SPECIAL_FG }]}>Special</Text>
+              <Text
+                style={[
+                  st.abs,
+                  { left: u(11), top: u(sansTop(176, 41)), fontFamily: F.regular, fontSize: u(41), lineHeight: u(49), color: DAY.muted },
+                ]}>
+                {list.length === 0 ? 'No bookings' : `${list.length} booking${list.length > 1 ? 's' : ''}`}
+              </Text>
+              <View style={[st.abs, st.rateRow, { top: u(serifTop(180, 67)), right: u(8), gap: u(38) }]}>
+                <Text numberOfLines={1} style={{ fontFamily: F.pageSerif, fontSize: u(43), lineHeight: u(52), color: DAY.muted }}>
+                  {CATEGORY_LABEL[categoryFor(iso)]} rate
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  style={{ fontFamily: F.pageSerifBold, fontSize: u(67), lineHeight: u(80), color: DAY.rate, fontVariant: ['lining-nums'] }}>
+                  {/* PT Serif has no rupee glyph; Inter supplies it. */}
+                  <Text style={{ fontFamily: F.bold, fontSize: u(60) }}>₹</Text>
+                  {inr(priceFor(iso, 'full')).replace('₹', '')}
+                </Text>
               </View>
-            ) : null}
-          </View>
-        ) : null}
+            </View>
 
-        <View style={{ gap: 5, marginTop: 8 }}>
-          {segments.map((s) => {
-            const state = seg[s.key];
-            const pill = STATE_PILL[state];
-            const slot = SEG_SLOT[s.key];
-            const bookable = state === 'free' && SLOT_SEGMENTS[slot].every((k) => seg[k] === 'free');
-            const booking = list.find((b) => SLOT_SEGMENTS[b.slot].includes(s.key));
-            const icon = SEG_ICON[s.key];
-            const action =
-              state === 'free' ? (
-                <Touchable
-                  onPress={() => onBook(slot)}
-                  disabled={!bookable}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Book ${s.label}`}
-                  hitSlop={BTN_SLOP}
-                  style={[st.actBtn, inline && st.actBtnWide]}>
-                  <Ionicons name="add" size={15} color={C.onPrimary} />
-                  <Text style={st.actText}>Book</Text>
-                </Touchable>
-              ) : booking ? (
-                <Touchable
-                  onPress={() => onOpenBooking(booking)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`View ${s.label} booking`}
-                  hitSlop={BTN_SLOP}
-                  style={[st.actBtn, inline && st.actBtnWide, st.viewBtn]}>
-                  <Text style={[st.actText, { color: C.primary }]}>View</Text>
-                  <Ionicons name="chevron-forward" size={14} color={C.primary} />
-                </Touchable>
-              ) : inline ? (
-                <View style={st.actBtnWide} />
-              ) : null;
-            return (
-              <View key={s.key} style={st.slot}>
-                <View style={st.slotIcon}>
-                  {icon.lib === 'mci' ? (
-                    <MaterialCommunityIcons name={icon.name} size={20} color={C.accent} />
-                  ) : (
-                    <Ionicons name={icon.name} size={19} color={C.accent} />
-                  )}
-                </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={st.slotLabel} numberOfLines={1}>
-                    {s.label}
-                  </Text>
-                  <Text style={st.slotTime} numberOfLines={1} adjustsFontSizeToFit>
-                    {fmtClock(s.start)} – {fmtClock(s.end)}
-                  </Text>
-                </View>
-                <View style={inline ? st.slotInline : st.slotStack}>
-                  <View style={[st.pill, inline && st.pillWide, { backgroundColor: pill.bg }]}>
-                    <Text style={[st.pillText, { color: pill.fg }]}>{pill.label}</Text>
+            {tags ? (
+              <View style={[st.tagRow, { gap: u(18), marginTop: -u(8), marginBottom: u(20), paddingLeft: u(11) }]}>
+                {types.includes('muhurtham') ? (
+                  <View style={[st.chip, tag, { backgroundColor: D.muhurtham.bg }]}>
+                    <Ionicons name="star" size={u(40)} color={C.accent} />
+                    <Text style={[st.tagText, tagText, { color: D.muhurtham.fg }]}>Muhurtham</Text>
                   </View>
-                  {action}
-                </View>
+                ) : null}
+                {types.includes('special') ? (
+                  <View style={[st.chip, tag, { backgroundColor: TINT.special }]}>
+                    <MaterialCommunityIcons name="asterisk" size={u(40)} color={SPECIAL_FG} />
+                    <Text style={[st.tagText, tagText, { color: SPECIAL_FG }]}>Special</Text>
+                  </View>
+                ) : null}
               </View>
-            );
-          })}
-        </View>
-      </View>
+            ) : null}
+
+            {/* Segment rows: icon, name and time, status pill, action */}
+            <View style={{ gap: u(22) }}>
+              {segments.map((s) => {
+                const state = seg[s.key];
+                const pill = STATE_PILL[state];
+                const slot = SEG_SLOT[s.key];
+                const bookable = state === 'free' && SLOT_SEGMENTS[slot].every((k) => seg[k] === 'free');
+                const booking = list.find((b) => SLOT_SEGMENTS[b.slot].includes(s.key));
+                const icon = SEG_ICON[s.key];
+                const btn = { width: u(247), height: u(97), borderRadius: u(20), gap: u(34) };
+                const btnText = { fontSize: u(50), lineHeight: u(60) };
+                const action =
+                  state === 'free' ? (
+                    <Touchable
+                      onPress={() => onBook(slot)}
+                      disabled={!bookable}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Book ${s.label}`}
+                      hitSlop={BTN_SLOP}
+                      style={[st.actBtn, btn]}>
+                      <BrandGradient id={`bookGrad-${s.key}`} from="#9B2344" to="#7A1130" />
+                      <Ionicons name="add" size={u(66)} color={C.onPrimary} />
+                      <Text style={[st.actText, btnText]}>Book</Text>
+                    </Touchable>
+                  ) : booking ? (
+                    <Touchable
+                      onPress={() => onOpenBooking(booking)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`View ${s.label} booking`}
+                      hitSlop={BTN_SLOP}
+                      style={[st.actBtn, btn, st.viewBtn, { gap: u(14) }]}>
+                      <Text style={[st.actText, btnText, { color: C.primary }]}>View</Text>
+                      <Ionicons name="chevron-forward" size={u(48)} color={C.primary} />
+                    </Touchable>
+                  ) : (
+                    <View style={btn} />
+                  );
+                return (
+                  <View key={s.key} style={[st.slot, { height: u(175), borderRadius: u(28), paddingLeft: u(18), paddingRight: u(20) }]}>
+                    <View style={[st.slotIcon, { width: u(112), height: u(120), borderRadius: u(24) }]}>
+                      {icon.lib === 'mci' ? (
+                        <MaterialCommunityIcons name={icon.name} size={u(80)} color={DAY.icon} />
+                      ) : (
+                        <Ionicons name={icon.name} size={u(72)} color={DAY.icon} />
+                      )}
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0, marginLeft: u(26) }}>
+                      <Text numberOfLines={1} style={{ fontFamily: F.pageSerifBold, fontSize: u(50), lineHeight: u(60), color: DAY.ink }}>
+                        {s.label}
+                      </Text>
+                      <Text
+                        numberOfLines={1}
+                        style={{
+                          fontFamily: F.regular,
+                          fontSize: u(38.5),
+                          lineHeight: u(48),
+                          letterSpacing: u(1),
+                          color: DAY.muted,
+                          marginTop: u(6),
+                        }}>
+                        {fmtClock(s.start)} – {fmtClock(s.end)}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        st.pill,
+                        { width: u(174), height: u(72), borderRadius: u(16), marginRight: u(29) },
+                        { backgroundColor: state === 'free' ? DAY.vacantBg : pill.bg },
+                      ]}>
+                      <Text
+                        numberOfLines={1}
+                        style={{
+                          fontFamily: F.pageSerif,
+                          fontSize: u(state === 'free' ? 44 : 36),
+                          lineHeight: u(52),
+                          color: state === 'free' ? DAY.vacantFg : pill.fg,
+                        }}>
+                        {pill.label}
+                      </Text>
+                    </View>
+                    {action}
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        </>
+      ) : null}
     </View>
   );
 }
@@ -425,13 +525,13 @@ const st = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#F1E9E2',
-    paddingHorizontal: 7,
-    paddingTop: 8,
-    paddingBottom: 8,
+    paddingHorizontal: 10,
+    paddingTop: 12,
+    paddingBottom: 12,
     ...elevation,
     shadowOpacity: 0.04,
   },
-  monthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, paddingHorizontal: 5 },
+  monthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, paddingHorizontal: 5 },
   nav: {
     width: 34,
     height: 34,
@@ -457,11 +557,11 @@ const st = StyleSheet.create({
   /** Wider than tall, like the printed wall calendars halls keep at the desk. */
   cell: {
     flex: 1,
-    height: 37,
+    height: 43,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
+    gap: 6,
     overflow: 'hidden',
   },
   cellPlain: {
@@ -494,14 +594,14 @@ const st = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.55)',
   },
-  mark: { position: 'absolute', top: 6, left: 4 },
+  mark: { position: 'absolute', top: 8, left: 4 },
   num: { fontFamily: F.semibold, fontSize: 12.5, lineHeight: 15, color: C.text, paddingLeft: 3 },
   numOutside: { fontFamily: F.regular, fontSize: 12.5, color: '#CFC6BF' },
-  star: { position: 'absolute', top: 3, right: 4 },
+  star: { position: 'absolute', top: 5, right: 4 },
   dots: { flexDirection: 'row', gap: 3.5 },
   dot: { width: 5.5, height: 5.5, borderRadius: 3 },
 
-  legend: { marginTop: 10, backgroundColor: '#F8F4EF', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 8 },
+  legend: { marginTop: 12, backgroundColor: '#F8F4EF', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11 },
   legendRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 6, columnGap: 4 },
   legendRule: { height: 1, backgroundColor: '#ECE3DA', marginVertical: 8 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -510,97 +610,38 @@ const st = StyleSheet.create({
 
   detail: {
     flexDirection: 'row',
-    backgroundColor: C.surface,
-    borderRadius: 14,
+    minHeight: 200,
+    backgroundColor: '#FFFDF9',
+    borderWidth: 1,
+    borderColor: '#F1D9C2',
     overflow: 'hidden',
-    ...elevation,
+    boxShadow: '0px 4px 14px rgba(87, 21, 44, 0.08)',
   },
-  dateCol: {
-    width: 84,
-    backgroundColor: C.primary,
-    alignItems: 'center',
-    paddingTop: 10,
-    paddingBottom: 64,
-    paddingHorizontal: 4,
-    overflow: 'hidden',
-  },
-  dateArt: { position: 'absolute', left: 0, right: 0, bottom: 0 },
-  dateArtImg: { width: '100%', aspectRatio: 582 / 408 },
-  dateNum: { fontFamily: F.serifBold, fontSize: 44, lineHeight: 48, color: C.onPrimary, fontVariant: ['lining-nums'] },
-  dateMonth: { fontFamily: F.serifSemibold, fontSize: 14, color: C.onPrimary, fontVariant: ['lining-nums'] },
-  dateWeekday: { fontFamily: F.serifSemibold, fontSize: 14, color: C.onPrimary, marginTop: 1 },
-  datePhase: { fontFamily: F.serifSemibold, fontSize: 14, color: C.onPrimary, marginTop: 3 },
-  detailBody: { flex: 1, paddingHorizontal: 8, paddingTop: 8, paddingBottom: 8 },
-  detailHead: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    columnGap: 6,
-    rowGap: 4,
-    paddingLeft: 4,
-  },
-  detailTitle: { fontFamily: F.serifBold, fontSize: 19, lineHeight: 23, color: C.text, fontVariant: ['lining-nums'] },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: S.vacantSoft,
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-  },
-  chipText: { fontFamily: F.medium, fontSize: 11.5, color: S.vacant },
-  subRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    columnGap: 6,
-    marginTop: 2,
-    paddingLeft: 4,
-  },
-  subText: { fontFamily: F.regular, fontSize: 10.5, color: C.textSecondary },
-  rate: { flexDirection: 'row', alignItems: 'baseline', gap: 5, marginLeft: 'auto' },
-  rateValue: { fontFamily: F.bold, fontSize: 16, color: C.primary },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 5, paddingLeft: 4 },
+  dateCol: { alignSelf: 'stretch', overflow: 'hidden', backgroundColor: '#700F2D' },
+  rateRow: { flexDirection: 'row', alignItems: 'baseline' },
+  colText: { position: 'absolute', left: 0, right: 0, textAlign: 'center' },
+  colIcon: { position: 'absolute', left: 0, right: 0, alignItems: 'center', justifyContent: 'center' },
+  abs: { position: 'absolute' },
+  chip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: DAY.vacantBg },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap' },
+  tagText: { fontFamily: F.pageSerif },
   slot: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
-    paddingVertical: 5,
-    paddingHorizontal: 5,
-    borderRadius: 9,
-    backgroundColor: '#FFFDFB',
+    backgroundColor: '#FFFDF9',
     borderWidth: 1,
-    borderColor: '#F2EBE4',
+    borderColor: DAY.slotBorder,
+    boxShadow: '0px 1px 3px rgba(87, 21, 44, 0.04)',
   },
-  slotIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 7,
-    backgroundColor: '#FBF2E3',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  slotLabel: { fontFamily: F.semibold, fontSize: 12, color: C.text },
-  slotTime: { fontFamily: F.regular, fontSize: 10, color: C.textSecondary, marginTop: 1 },
-  slotInline: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  slotStack: { alignItems: 'stretch', gap: 5 },
-  pill: { borderRadius: 7, paddingHorizontal: 7, paddingVertical: 4, alignItems: 'center', justifyContent: 'center' },
-  pillWide: { height: 25, minWidth: 48 },
-  pillText: { fontFamily: F.medium, fontSize: 11.5 },
+  slotIcon: { backgroundColor: DAY.iconBox, alignItems: 'center', justifyContent: 'center' },
+  pill: { alignItems: 'center', justifyContent: 'center' },
   actBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
-    backgroundColor: C.primary,
-    borderRadius: 8,
-    paddingHorizontal: 9,
-    height: 28,
+    overflow: 'hidden',
+    boxShadow: '0px 2px 5px rgba(87, 21, 44, 0.22)',
   },
-  actBtnWide: { height: 28, minWidth: 58, borderRadius: 8 },
-  viewBtn: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.primary },
-  actText: { fontFamily: F.semibold, fontSize: 12, color: C.onPrimary },
+  viewBtn: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.primary, boxShadow: 'none' },
+  actText: { fontFamily: F.pageSerif, color: C.onPrimary },
 });

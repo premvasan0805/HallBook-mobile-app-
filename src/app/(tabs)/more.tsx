@@ -50,10 +50,10 @@ export default function SettingsScreen() {
   return (
     <View style={st.screen}>
       {focused ? <StatusBar style="light" /> : null}
-
-
+      {/* Header stays pinned; only the content below it scrolls. */}
+      {/* The profile avatar links here, so it is hidden on this tab. */}
+      <CompactBrandHeader topInset={insets.top} showProfile={false} />
       <ScrollView contentContainerStyle={st.content} showsVerticalScrollIndicator={false}>
-        <CompactBrandHeader topInset={insets.top} />
 
         <View style={st.body}>
           <Text style={st.title}>Settings</Text>

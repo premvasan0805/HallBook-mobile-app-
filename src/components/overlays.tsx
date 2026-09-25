@@ -30,6 +30,7 @@ export function BottomSheet({
   subtitle,
   children,
   footer,
+  header,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -37,6 +38,8 @@ export function BottomSheet({
   subtitle?: string;
   children: ReactNode;
   footer?: ReactNode;
+  /** Replaces the plain title/subtitle block; the close button stays on the right. */
+  header?: ReactNode;
 }) {
   const { height } = useWindowDimensions();
   return (
@@ -48,12 +51,14 @@ export function BottomSheet({
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <Animated.View entering={SlideInDown.duration(240)} style={[st.sheet, { maxHeight: height * 0.9 }]}>
             <View style={st.grabber} />
-            {title ? (
+            {header || title ? (
               <View style={st.sheetHead}>
-                <View style={{ flex: 1 }}>
-                  <Text style={T.section}>{title}</Text>
-                  {subtitle ? <Text style={T.secondary}>{subtitle}</Text> : null}
-                </View>
+                {header ?? (
+                  <View style={{ flex: 1 }}>
+                    <Text style={T.section}>{title}</Text>
+                    {subtitle ? <Text style={T.secondary}>{subtitle}</Text> : null}
+                  </View>
+                )}
                 <IconButton icon="close" size={36} onPress={onClose} accessibilityLabel="Close" />
               </View>
             ) : null}

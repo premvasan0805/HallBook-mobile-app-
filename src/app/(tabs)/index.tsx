@@ -1,45 +1,20 @@
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useState } from 'react';
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import Svg, { ClipPath, Defs, Image as SvgImage, Path } from 'react-native-svg';
 
 import { openBooking } from '@/components/cards';
 import { currentYM, shiftMonth } from '@/components/calendar';
-import { BrandGradient, Lotus, Mandala } from '@/components/decor';
+import { BrandGradient, Mandala } from '@/components/decor';
+import { HomeHero } from '@/components/home-hero';
 import { EmptyState, Screen, Touchable, type IconName } from '@/components/primitives';
 import { fmtClock, fmtLong, greeting, initials, inr, inrShort, MONTHS, parseISO, todayISO } from '@/lib/format';
 import { balanceOf, payState, SLOT_LABEL, useStore, type Booking, type Segment } from '@/lib/store';
 import { appWidth, C, elevation, F } from '@/lib/theme';
 
-const VENUE = require('../../../assets/images/home/venue.png');
-
 /** Home is laid out on the 903px-wide design reference; `u(px)` converts a reference pixel to dp. */
 const REF_WIDTH = 903;
-
-/**
- * Hero card outline in reference px (833×194): full height on the left, then an S-curve
- * steps the top edge down 66px so more of the venue photo shows on the right.
- */
-const HERO_SHAPE =
-  'M0 30Q0 0 30 0L487 0C558 0 558 66 629 66L803 66Q833 66 833 96L833 164Q833 194 803 194L30 194Q0 194 0 164Z';
-
-/** True when a point (hero-local reference px) is on or below the hero's curved top edge. */
-function inHeroShape(x: number, y: number) {
-  if (x < 0 || x > 833 || y > 194) return false;
-  if (x <= 487) return y >= 0;
-  if (x >= 629) return y >= 66;
-  // The S-curve's cubic has flat tangents at both ends, which smoothstep matches closely.
-  const t = (x - 487) / 142;
-  return y >= 66 * t * t * (3 - 2 * t);
-}
-
-/**
- * Venue photo outline in reference px (355×222): the left edge runs diagonally up from under the
- * hero card, then eases into a near-flat top so the tagline and header sit on plain background.
- */
-const PHOTO_EDGE = 'M0 196L135 70Q190 20 260 15L355 8';
-const PHOTO_SHAPE = `${PHOTO_EDGE}L355 222L0 222Z`;
+/** Side padding of the page content, in reference px. */
+const PAD = 32;
 
 type Trend = { text: string; dir: 'up' | 'down' | 'flat' };
 
@@ -69,7 +44,6 @@ export default function HomeScreen() {
   const u = (px: number) => (appWidth(width) / REF_WIDTH) * px;
   /** Font size from the reference, never below 11dp so small print stays readable. */
   const fs = (px: number) => Math.max(u(px), 11);
-  const [heroPressed, setHeroPressed] = useState(false);
 
   const today = todayISO();
   const ym = currentYM();
@@ -117,206 +91,36 @@ export default function HomeScreen() {
 
   const openHero = () => (next ? openBooking(next.id) : router.push('/calendar'));
 
+  // Greeting, tagline, venue photo and today's bookings — pinned above the scroll view so only the cards below scroll.
+  const header = (
+    <HomeHero
+      greeting={greeting()}
+      name={hall.role}
+      hallName={hall.name}
+      initials={initials(hall.role)}
+      hasAlerts={upcoming.length > 0}
+      count={todays.length}
+      title={todays.length > 0 ? `${todays[0].eventType} · ${SLOT_LABEL[todays[0].slot]}` : 'No events today'}
+      subtitle={
+        todays.length > 0
+          ? `${customerById(todays[0].customerId)?.name ?? ''} · ${fmtLong(today)}`
+          : next
+            ? `Next: ${customerById(next.customerId)?.name ?? ''} · ${fmtLong(next.date)}`
+            : fmtLong(today)
+      }
+      onOpen={openHero}
+      onHall={() => router.push('/settings/hall')}
+      onAlerts={() => router.push('/settings/notifications')}
+      onProfile={() => router.push('/more')}
+    />
+  );
+
   return (
     <Screen
       tab
+      header={header}
       onRefresh={() => new Promise((r) => setTimeout(r, 500))}
-      contentStyle={{ paddingHorizontal: u(62), paddingTop: 0, gap: 0, flexGrow: 1 }}>
-      {/* ---------- Greeting, tagline, venue photo and today's bookings ---------- */}
-      <View style={{ height: u(442), marginHorizontal: -u(62) }}>
-        <View style={{ position: 'absolute', left: -u(22), top: u(140) }} pointerEvents="none">
-          <Lotus size={u(150)} color={C.accent} opacity={0.22} />
-        </View>
-
-        <View style={{ position: 'absolute', left: u(65), top: u(24), right: u(460) }}>
-          <Text style={{ fontFamily: F.regular, fontSize: u(25), lineHeight: u(32), color: C.textSecondary }}>
-            {greeting()},
-          </Text>
-          <Text
-            style={{ fontFamily: F.serifBold, fontSize: u(54), lineHeight: u(62), color: C.text }}
-            numberOfLines={1}>
-            {hall.role}
-          </Text>
-          <Touchable
-            onPress={() => router.push('/settings/hall')}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: u(12), marginTop: u(6) }}
-            accessibilityLabel="Hall details">
-            <Ionicons name="business-outline" size={u(28)} color={C.primary} />
-            <Text style={{ fontFamily: F.regular, fontSize: u(25), color: C.text, flexShrink: 1 }} numberOfLines={1}>
-              {hall.name}
-            </Text>
-            <Ionicons name="chevron-forward" size={u(22)} color={C.text} />
-          </Touchable>
-        </View>
-
-        {/* Venue photo bleeds off the right edge; the hero card overlaps its bottom, bell and avatar sit on top. */}
-        <View
-          pointerEvents="none"
-          style={{ position: 'absolute', left: u(548), top: u(100), width: u(355), height: u(222), zIndex: 0 }}>
-          <Svg width="100%" height="100%" viewBox="0 0 355 222">
-            <Defs>
-              <ClipPath id="venueClip">
-                <Path d={PHOTO_SHAPE} />
-              </ClipPath>
-            </Defs>
-            <SvgImage
-              href={VENUE}
-              width={355}
-              height={222}
-              preserveAspectRatio="xMinYMid slice"
-              clipPath="url(#venueClip)"
-            />
-            <Path d={PHOTO_EDGE} fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth={5} />
-          </Svg>
-        </View>
-
-        <View style={{ position: 'absolute', left: u(462), top: u(70), zIndex: 2 }} pointerEvents="none">
-          <Text style={{ fontFamily: F.serif, fontSize: u(31), lineHeight: u(33), color: C.textSecondary }}>
-            Make Every
-          </Text>
-          <Text style={{ fontFamily: F.serif, fontSize: u(31), lineHeight: u(33), color: C.accentText }}>
-            Celebration{'\n'}Memorable
-          </Text>
-          <View style={{ width: u(44), height: u(3), backgroundColor: C.accent, marginTop: u(20) }} />
-        </View>
-
-        {/* Only the curved outline is tappable: touches are hit-tested against the curve; the content ignores them. */}
-        <View
-          accessible
-          accessibilityRole="button"
-          accessibilityLabel="Today's bookings"
-          accessibilityActions={[{ name: 'activate' }]}
-          onAccessibilityAction={openHero}
-          onStartShouldSetResponder={(e) => inHeroShape(e.nativeEvent.locationX / u(1), e.nativeEvent.locationY / u(1))}
-          onResponderGrant={() => setHeroPressed(true)}
-          onResponderTerminate={() => setHeroPressed(false)}
-          onResponderRelease={(e) => {
-            setHeroPressed(false);
-            if (inHeroShape(e.nativeEvent.locationX / u(1), e.nativeEvent.locationY / u(1))) openHero();
-          }}
-          style={[
-            st.hero,
-            { left: u(56), top: u(248), width: u(833), height: u(194) },
-            heroPressed && { opacity: 0.82, transform: [{ scale: 0.985 }] },
-          ]}>
-          <View style={StyleSheet.absoluteFill} pointerEvents="none">
-            <BrandGradient id="heroGrad" from={C.gradientFrom} to={C.gradientTo} viewBox="0 0 833 194" shape={HERO_SHAPE} />
-          </View>
-          <View style={StyleSheet.absoluteFill} pointerEvents="none">
-            <View style={{ position: 'absolute', left: u(430), top: u(-40) }}>
-              <Mandala size={u(230)} color={C.accentOnPrimary} opacity={0.13} />
-            </View>
-            <View style={{ position: 'absolute', left: u(40), top: u(30), flexDirection: 'row', alignItems: 'center', gap: u(22) }}>
-              <MaterialCommunityIcons name="calendar-month-outline" size={u(40)} color={C.accentOnPrimary} />
-              <Text style={{ fontFamily: F.serifBold, fontSize: u(31), lineHeight: u(38), color: C.accentOnPrimary }}>
-                Today&apos;s Bookings
-              </Text>
-            </View>
-            <Text
-              style={{
-                position: 'absolute',
-                left: u(40),
-                top: u(72),
-                fontFamily: F.serifBold,
-                fontSize: u(104),
-                lineHeight: u(116),
-                color: C.accentOnPrimary,
-                fontVariant: ['lining-nums'],
-              }}>
-              {todays.length}
-            </Text>
-            <View style={{ position: 'absolute', left: u(140), top: u(92), width: u(470) }}>
-              {todays.length > 0 ? (
-                <>
-                  <Text style={st.heroTitle(u)} numberOfLines={1}>
-                    {todays[0].eventType} · {SLOT_LABEL[todays[0].slot]}
-                  </Text>
-                  <Text style={st.heroSub(u)} numberOfLines={1}>
-                    {customerById(todays[0].customerId)?.name ?? ''} · {fmtLong(today)}
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <Text style={st.heroTitle(u)} numberOfLines={1}>
-                    No events today
-                  </Text>
-                  <Text style={st.heroSub(u)} numberOfLines={1}>
-                    {next ? `Next: ${customerById(next.customerId)?.name ?? ''} · ${fmtLong(next.date)}` : fmtLong(today)}
-                  </Text>
-                </>
-              )}
-            </View>
-            <View
-              style={{
-                position: 'absolute',
-                left: u(640),
-                top: u(106),
-                width: u(160),
-                height: u(62),
-                borderRadius: u(31),
-                borderWidth: 1,
-                borderColor: 'rgba(255,240,210,0.9)',
-                overflow: 'hidden',
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: u(14),
-                ...elevation,
-              }}>
-              <BrandGradient id="heroViewGrad" from="#FCEFD3" to="#E8C88C" />
-              <Text style={{ fontFamily: F.semibold, fontSize: u(26), color: C.primary }}>View</Text>
-              <Ionicons name="arrow-forward" size={u(26)} color={C.primary} />
-            </View>
-          </View>
-        </View>
-
-        <Touchable
-          onPress={() => router.push('/settings/notifications')}
-          accessibilityLabel="Notifications"
-          style={{
-            position: 'absolute',
-            left: u(686),
-            top: u(26),
-            width: u(58),
-            height: u(58),
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 3,
-          }}>
-          <Ionicons name="notifications-outline" size={u(44)} color={C.text} />
-          {upcoming.length > 0 ? (
-            <View
-              style={{
-                position: 'absolute',
-                top: u(6),
-                right: u(8),
-                width: u(15),
-                height: u(15),
-                borderRadius: u(8),
-                backgroundColor: C.danger,
-              }}
-            />
-          ) : null}
-        </Touchable>
-        <Touchable
-          onPress={() => router.push('/more')}
-          accessibilityLabel="Profile"
-          style={{
-            position: 'absolute',
-            left: u(769),
-            top: u(18),
-            width: u(74),
-            height: u(74),
-            borderRadius: u(37),
-            backgroundColor: C.primaryTint,
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 3,
-          }}>
-          <Text style={{ fontFamily: F.semibold, fontSize: u(32), color: C.primary }}>{initials(hall.role)}</Text>
-        </Touchable>
-      </View>
-
+      contentStyle={{ paddingHorizontal: u(PAD), paddingTop: 0, gap: 0, flexGrow: 1 }}>
       {/* ---------- This month ---------- */}
       <View
         style={{ flexDirection: 'row', flexWrap: 'wrap', gap: u(16), rowGap: u(14), marginTop: u(22) }}
@@ -329,11 +133,11 @@ export default function HomeScreen() {
             style={[
               st.card,
               {
-                width: (appWidth(width) - u(62) * 2 - u(16)) / 2,
-                height: u(152),
+                width: (appWidth(width) - u(PAD) * 2 - u(16)) / 2,
+                height: u(176),
                 borderRadius: u(22),
-                paddingLeft: u(23),
-                gap: u(32),
+                paddingLeft: u(30),
+                gap: u(26),
               },
             ]}>
             <View
@@ -379,7 +183,7 @@ export default function HomeScreen() {
       {upcoming.length === 0 ? (
         <EmptyState icon="calendar-outline" title="No upcoming events" message="New bookings will appear here." />
       ) : (
-        <View style={{ gap: u(16) }}>
+        <View style={{ gap: 10 }}>
           {upcoming.slice(0, 5).map((b) => (
             <EventRow
               key={b.id}
@@ -416,7 +220,7 @@ function MiniBars({ color, u }: { color: string; u: (n: number) => number }) {
   return (
     <View
       pointerEvents="none"
-      style={{ position: 'absolute', right: u(24), top: u(44), flexDirection: 'row', alignItems: 'flex-end', gap: u(6), opacity: 0.22 }}>
+      style={{ position: 'absolute', right: u(28), top: u(54), flexDirection: 'row', alignItems: 'flex-end', gap: u(6), opacity: 0.22 }}>
       {[26, 40, 56].map((h) => (
         <View key={h} style={{ width: u(14), height: u(h), borderRadius: u(5), backgroundColor: color }} />
       ))}
@@ -468,7 +272,7 @@ function EventRow({
     <Touchable
       onPress={() => openBooking(booking.id)}
       accessibilityLabel={`${name}, ${booking.eventType}, ${inr(booking.total)}, ${badge.label}`}
-      style={[st.card, { minHeight: u(144), borderRadius: u(22), paddingLeft: u(20), paddingRight: u(18), gap: u(24) }]}>
+      style={[st.card, { minHeight: u(164), borderRadius: u(22), paddingLeft: u(28), paddingRight: u(24), gap: u(26) }]}>
       <View
         style={{
           width: u(98),
@@ -485,7 +289,7 @@ function EventRow({
           {MONTHS[d.getMonth()].slice(0, 3).toUpperCase()}
         </Text>
       </View>
-      <View style={{ flex: 1, paddingVertical: u(16) }}>
+      <View style={{ flex: 1, paddingVertical: u(24) }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: u(10) }}>
           <Text style={{ flex: 1, fontFamily: F.semibold, fontSize: u(27), lineHeight: u(36), color: C.text }} numberOfLines={1}>
             {name}
@@ -520,7 +324,6 @@ function EventRow({
 
 const st = {
   ...StyleSheet.create({
-    hero: { position: 'absolute', overflow: 'hidden', zIndex: 1 },
     card: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -529,13 +332,6 @@ const st = {
     },
     sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     cta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  }),
-  heroTitle: (u: (n: number) => number) => ({ fontFamily: F.semibold, fontSize: u(31), lineHeight: u(40), color: C.onPrimary }),
-  heroSub: (u: (n: number) => number) => ({
-    fontFamily: F.regular,
-    fontSize: Math.max(u(24), 11),
-    color: C.onPrimarySoft,
-    marginTop: u(6),
   }),
   meta: (u: (n: number) => number) => ({ fontFamily: F.regular, fontSize: u(21), color: C.textSecondary }),
 };

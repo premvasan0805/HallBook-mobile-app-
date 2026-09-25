@@ -12,11 +12,12 @@ import {
   type TextInputProps,
 } from 'react-native';
 
-import { BrandCta, BrandFloral, BrandPageHeader, GOLD, GoldRule, SLOT_META, type MciName } from '@/components/brand-page';
+import { BrandCta, BrandPageHeader, GOLD, GoldRule, SLOT_META, type MciName } from '@/components/brand-page';
 import { CalendarGrid, CalendarLegend, MonthHeader, type YM } from '@/components/calendar';
 import { SearchBar } from '@/components/form';
 import { BottomSheet, useToast } from '@/components/overlays';
 import { EmptyState, ErrorState, Screen, SecondaryButton, Touchable } from '@/components/primitives';
+import { BrandGradient } from '@/components/decor';
 import { CustomerFormSheet } from '@/components/sheets';
 import { Avatar } from '@/components/status';
 import { fmtLong, inr, parseISO, toNum, todayISO } from '@/lib/format';
@@ -68,7 +69,8 @@ export default function BookingFormScreen() {
     return { y: d.getFullYear(), m: d.getMonth() };
   });
   const [slot, setSlot] = useState<SlotKey | null>(editing?.slot ?? params.slot ?? null);
-  const [eventType, setEventType] = useState(editing?.eventType ?? 'Wedding');
+  const [eventType, setEventType] = useState(editing?.eventType ?? '');
+  const [pickingType, setPickingType] = useState(false);
   const [newType, setNewType] = useState<string | null>(null);
   const [bride, setBride] = useState(editing?.brideName ?? '');
   const [groom, setGroom] = useState(editing?.groomName ?? '');
@@ -86,6 +88,8 @@ export default function BookingFormScreen() {
   const [status, setStatus] = useState<BookingStatus>(editing?.status ?? 'confirmed');
   const [q, setQ] = useState('');
   const [pickingDate, setPickingDate] = useState(false);
+  /** Day tapped in the date sheet; only becomes the booking date on "Apply Date". */
+  const [pendingDate, setPendingDate] = useState<string | null>(null);
   const [pickingCustomer, setPickingCustomer] = useState(false);
   const [addingCustomer, setAddingCustomer] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -185,7 +189,6 @@ export default function BookingFormScreen() {
 
   return (
     <View style={st.screen}>
-      <BrandFloral bottom={60} />
       <BrandPageHeader title={editing ? 'Edit' : 'New'} accent="Booking" />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -199,7 +202,13 @@ export default function BookingFormScreen() {
                 {date ? fmtLong(date) : 'Not selected'}
               </Text>
             </View>
-            <Touchable onPress={() => setPickingDate(true)} accessibilityRole="button" style={st.outlineBtn}>
+            <Touchable
+              onPress={() => {
+                setPendingDate(date);
+                setPickingDate(true);
+              }}
+              accessibilityRole="button"
+              style={st.outlineBtn}>
               <MaterialCommunityIcons name="calendar-month-outline" size={16} color={C.primary} />
               <Text style={st.outlineBtnText}>{date ? 'Change Date' : 'Select Date'}</Text>
             </Touchable>
@@ -268,33 +277,61 @@ export default function BookingFormScreen() {
           {/* Event details */}
           <Section icon={<MaterialCommunityIcons name="note-text-outline" size={20} color={C.primary} />} title="Event Details" indent>
             <View style={{ gap: 12 }}>
-              <View style={{ gap: 8 }}>
-                <Text style={st.label}>Event type</Text>
-                <View style={st.chips}>
-                  {store.eventTypes.map((t) => {
-                    const m = EVENT_META[t] ?? EVENT_FALLBACK;
-                    const on = eventType === t;
-                    return (
-                      <Touchable
-                        key={t}
-                        onPress={() => setEventType(t)}
-                        accessibilityRole="radio"
-                        accessibilityState={{ selected: on }}
-                        style={[st.chip, { backgroundColor: m.bg, borderColor: on ? m.fg : m.bg }, on && st.chipOn]}>
-                        <MaterialCommunityIcons name={m.icon} size={15} color={m.fg} />
-                        <Text style={[st.chipText, { color: m.fg }, on && { fontFamily: F.semibold }]}>{t}</Text>
-                      </Touchable>
-                    );
-                  })}
-                  <Touchable
-                    onPress={() => setNewType((v) => (v === null ? '' : null))}
-                    accessibilityRole="button"
-                    accessibilityState={{ expanded: newType !== null }}
-                    style={[st.chip, st.chipAdd, newType !== null && st.chipAddOn]}>
-                    <Ionicons name="add" size={15} color={C.primary} />
-                    <Text style={[st.chipText, { color: C.primary }]}>Add new</Text>
-                  </Touchable>
-                </View>
+              <View style={{ gap: 6 }}>
+                <Text style={st.label}>
+                  Event type <Text style={{ color: C.danger }}>*</Text>
+                </Text>
+                <Touchable
+                  onPress={() => setPickingType((v) => !v)}
+                  accessibilityRole="button"
+                  accessibilityLabel={eventType ? `Event type: ${eventType}` : 'Select event type'}
+                  accessibilityState={{ expanded: pickingType }}
+                  style={[st.select, pickingType && { borderColor: C.primary }]}>
+                  <MaterialCommunityIcons
+                    name={eventType ? (EVENT_META[eventType] ?? EVENT_FALLBACK).icon : 'ring'}
+                    size={20}
+                    color={C.primary}
+                  />
+                  <Text style={st.selectText} numberOfLines={1}>
+                    {eventType || 'Select event type'}
+                  </Text>
+                  <Ionicons name={pickingType ? 'chevron-up' : 'chevron-down'} size={18} color={C.text} />
+                </Touchable>
+                {pickingType ? (
+                  <View style={st.menu}>
+                    {store.eventTypes.map((t) => {
+                      const m = EVENT_META[t] ?? EVENT_FALLBACK;
+                      const on = eventType === t;
+                      return (
+                        <Touchable
+                          key={t}
+                          onPress={() => {
+                            setEventType(t);
+                            setPickingType(false);
+                          }}
+                          accessibilityRole="radio"
+                          accessibilityState={{ selected: on }}
+                          style={[st.menuItem, on && { backgroundColor: C.primarySoft }]}>
+                          <View style={[st.typeIcon, { backgroundColor: m.bg }]}>
+                            <MaterialCommunityIcons name={m.icon} size={16} color={m.fg} />
+                          </View>
+                          <Text style={[st.menuText, on && { fontFamily: F.semibold, color: C.primary }]}>{t}</Text>
+                          {on ? <Ionicons name="checkmark" size={18} color={C.primary} /> : null}
+                        </Touchable>
+                      );
+                    })}
+                    <Touchable
+                      onPress={() => {
+                        setPickingType(false);
+                        setNewType('');
+                      }}
+                      accessibilityRole="button"
+                      style={[st.menuItem, st.menuAdd]}>
+                      <Ionicons name="add" size={18} color={C.primary} />
+                      <Text style={[st.menuText, { fontFamily: F.semibold, color: C.primary }]}>Add new event type</Text>
+                    </Touchable>
+                  </View>
+                ) : null}
               </View>
               {newType !== null ? (
                 <View style={{ gap: 10 }}>
@@ -441,26 +478,51 @@ export default function BookingFormScreen() {
       </KeyboardAvoidingView>
 
       {/* Date picker */}
-      <BottomSheet visible={pickingDate} onClose={() => setPickingDate(false)} title="Select event date" subtitle="Fully booked and blocked days can't be selected.">
-        <View style={{ paddingHorizontal: 2 }}>
-          <MonthHeader ym={ym} onChange={setYm} />
-          <CalendarGrid
-            ym={ym}
-            selected={date}
-            excludeId={excludeId}
-            onSelect={(iso) => {
-              setDate(iso);
-              if (slot && !SLOT_SEGMENTS[slot].every((s) => store.segmentState(iso, excludeId)[s] === 'free')) setSlot(null);
+      <BottomSheet
+        visible={pickingDate}
+        onClose={() => setPickingDate(false)}
+        header={
+          <>
+            <View style={st.tile}>
+              <Ionicons name="calendar-clear-outline" size={20} color={C.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={st.sheetTitle}>
+                Select <Text style={{ color: GOLD }}>event date</Text>
+              </Text>
+              <Text style={st.sheetSub}>Fully booked and blocked days can&apos;t be selected.</Text>
+            </View>
+          </>
+        }
+        footer={
+          <Touchable
+            onPress={() => {
+              if (!pendingDate) return;
+              setDate(pendingDate);
+              if (slot && !SLOT_SEGMENTS[slot].every((s) => store.segmentState(pendingDate, excludeId)[s] === 'free')) setSlot(null);
               setPickingDate(false);
             }}
+            disabled={!pendingDate}
+            accessibilityRole="button"
+            style={st.applyBtn}>
+            <BrandGradient id="applyDateGrad" from="#9A2244" to="#6A0B2D" />
+            <Text style={st.applyText}>Apply Date</Text>
+          </Touchable>
+        }>
+        <View style={{ paddingHorizontal: 2 }}>
+          <MonthHeader ym={ym} onChange={setYm} boxed />
+          <CalendarGrid
+            boxed
+            ym={ym}
+            selected={pendingDate}
+            excludeId={excludeId}
+            onSelect={setPendingDate}
             isDisabled={(iso) =>
               (iso < today && iso !== editing?.date) ||
               Object.values(store.segmentState(iso, excludeId)).every((s) => s !== 'free')
             }
           />
-          <View style={{ paddingHorizontal: 6, paddingTop: 4 }}>
-            <CalendarLegend />
-          </View>
+          <CalendarLegend boxed />
         </View>
       </BottomSheet>
 
@@ -622,20 +684,42 @@ const st = StyleSheet.create({
   },
   customerName: { fontFamily: F.medium, fontSize: 13.5, color: C.text },
 
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
+  select: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    minHeight: 32,
+    gap: 10,
+    minHeight: 44,
     paddingHorizontal: 12,
-    borderRadius: radius.pill,
+    borderRadius: 10,
     borderWidth: 1.2,
+    borderColor: '#DDB3BF',
+    backgroundColor: '#FFFBFB',
   },
-  chipOn: { borderWidth: 1.4 },
-  chipText: { fontFamily: F.medium, fontSize: 12, color: C.text },
-  chipAdd: { borderStyle: 'dashed', borderColor: C.primaryMuted, backgroundColor: C.surface },
-  chipAddOn: { borderStyle: 'solid', borderColor: C.primary, backgroundColor: C.primarySoft },
+  selectText: { flex: 1, fontFamily: F.medium, fontSize: 13.5, color: C.text },
+  typeIcon: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  menu: {
+    marginTop: 2,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.surface,
+    boxShadow: '0px 6px 16px rgba(87, 21, 44, 0.12)',
+  },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44, paddingHorizontal: 10 },
+  menuText: { flex: 1, fontFamily: F.medium, fontSize: 13.5, color: C.text },
+  menuAdd: { borderTopWidth: 1, borderTopColor: C.border, marginTop: 4 },
+  sheetTitle: { fontFamily: F.pageSerifBold, fontSize: 21, lineHeight: 26, color: C.primary },
+  sheetSub: { fontFamily: F.regular, fontSize: 11.5, lineHeight: 16, color: C.textSecondary, marginTop: 1 },
+  applyBtn: {
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    boxShadow: '0px 4px 10px rgba(87, 21, 44, 0.25)',
+  },
+  applyText: { fontFamily: F.pageSerifBold, fontSize: 17, color: C.onPrimary },
   formBtn: { flex: 1, height: 42, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   formBtnGhost: { borderWidth: 1.2, borderColor: C.primary, backgroundColor: C.surface },
   formBtnText: { fontFamily: F.semibold, fontSize: 14 },
