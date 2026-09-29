@@ -11,6 +11,7 @@ import {
   CormorantGaramond_600SemiBold,
   CormorantGaramond_700Bold,
 } from '@expo-google-fonts/cormorant-garamond';
+import { Lato_700Bold } from '@expo-google-fonts/lato';
 import { PTSerif_400Regular, PTSerif_700Bold } from '@expo-google-fonts/pt-serif';
 import { Stack } from 'expo-router/stack';
 import * as SplashScreen from 'expo-splash-screen';
@@ -39,6 +40,7 @@ export default function RootLayout() {
     CormorantGaramond_500Medium_Italic,
     PTSerif_400Regular,
     PTSerif_700Bold,
+    Lato_700Bold,
   });
   const ready = loaded || !!error;
   const { width } = useWindowDimensions();

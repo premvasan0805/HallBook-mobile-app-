@@ -6,7 +6,8 @@ import { IconButton, Touchable } from '@/components/primitives';
 import { BottomSheet } from '@/components/overlays';
 import { MONTHS, parseISO, toISO, todayISO } from '@/lib/format';
 import { useStore, type DateType } from '@/lib/store';
-import { C, D, F, radius, S, T } from '@/lib/theme';
+import { glassSurface, GradientFill, Sheen } from '@/components/glass';
+import { C, D, F, G, S } from '@/lib/theme';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -51,6 +52,25 @@ const KIND_BG: Record<DateType, string> = {
   holiday: D.holiday.bg,
 };
 
+/** Date-sheet tile tints: a little richer than the overview so they read on frosted glass. */
+const KIND_BOXED: Record<DateType, { bg: string; fg?: string }> = {
+  muhurtham: { bg: '#FBEFD2', fg: '#B0700E' },
+  valarpirai: { bg: '#EAE6FA' },
+  special: { bg: '#D5F0E8' },
+  holiday: { bg: '#FAE3EA' },
+};
+
+/** Legend column widths in the date sheet; the first holds "Partly booked". */
+const LEGEND_COLS = ['31%', '26%', '21%', '22%'] as const;
+
+/** Availability dots in the date sheet. */
+const DOT_BOXED: Record<string, string> = {
+  booked: '#E0143C',
+  partial: '#F28DA0',
+  tentative: '#F0A419',
+  blocked: '#7B86A0',
+};
+
 export function MonthHeader({ ym, onChange, boxed }: { ym: YM; onChange: (v: YM) => void; boxed?: boolean }) {
   const [picker, setPicker] = useState(false);
   const nav = (dir: -1 | 1) =>
@@ -60,7 +80,7 @@ export function MonthHeader({ ym, onChange, boxed }: { ym: YM; onChange: (v: YM)
         accessibilityLabel={dir < 0 ? 'Previous month' : 'Next month'}
         hitSlop={6}
         style={st.navBoxed}>
-        <Ionicons name={dir < 0 ? 'chevron-back' : 'chevron-forward'} size={18} color={C.text} />
+        <Ionicons name={dir < 0 ? 'chevron-back' : 'chevron-forward'} size={19} color={G.navy} />
       </Touchable>
     ) : (
       <IconButton
@@ -74,10 +94,10 @@ export function MonthHeader({ ym, onChange, boxed }: { ym: YM; onChange: (v: YM)
     <View style={st.monthRow}>
       {nav(-1)}
       <Touchable style={st.monthTitle} onPress={() => setPicker(true)} accessibilityLabel="Choose month">
-        <Text style={boxed ? st.monthBoxed : [T.section, { fontSize: 18 }]}>
+        <Text style={boxed ? st.monthBoxed : st.monthPlain}>
           {MONTHS[ym.m]} {ym.y}
         </Text>
-        <Ionicons name="chevron-down" size={16} color={boxed ? C.primary : C.textSecondary} />
+        <Ionicons name="chevron-down" size={boxed ? 17 : 14} color={boxed ? G.navy : G.blue} />
       </Touchable>
       {nav(1)}
       <MonthPicker
@@ -169,22 +189,24 @@ export function CalendarGrid({
                   <View
                     style={[
                       st.tile,
-                      kind && showIndicators && { backgroundColor: KIND_BG[kind], borderColor: KIND_BG[kind] },
+                      kind && showIndicators && { backgroundColor: KIND_BOXED[kind].bg },
                       isToday && st.tileToday,
                       isSel && st.tileSelected,
                     ]}>
+                    {isSel ? <GradientFill from={G.gradFrom} to={G.gradTo} radius={10} /> : null}
+                    {isSel ? <Sheen radius={10} strength={0.35} height="50%" /> : null}
                     <Text
                       style={[
                         st.tileText,
-                        muhurtham && { color: C.accent },
+                        muhurtham && { color: KIND_BOXED.muhurtham.fg },
                         avail === 'blocked' && st.strike,
                         (isToday || isSel) && { fontFamily: F.bold },
-                        isToday && !isSel && { color: C.primary },
+                        isToday && !isSel && { color: G.navy },
                         isSel && { color: C.onPrimary },
                       ]}>
                       {parseISO(iso).getDate()}
                     </Text>
-                    <View style={[st.tileDot, avail !== 'free' && { backgroundColor: isSel ? C.onPrimary : DOT[avail] }]} />
+                    <View style={[st.tileDot, avail !== 'free' && { backgroundColor: isSel ? C.onPrimary : DOT_BOXED[avail] }]} />
                   </View>
                 </Cell>
               );
@@ -201,7 +223,7 @@ export function CalendarGrid({
                     st.day,
                     kind && showIndicators && { backgroundColor: KIND_BG[kind] },
                     isToday && !isSel && st.today,
-                    isSel && { backgroundColor: C.primary },
+                    isSel && st.daySelected,
                   ]}>
                   <Text
                     style={[
@@ -224,6 +246,30 @@ export function CalendarGrid({
 }
 
 export function CalendarLegend({ boxed }: { boxed?: boolean }) {
+  if (boxed) {
+    // Date sheet: every key is a round dot, laid out in four columns.
+    const keys = [
+      { c: '#F6E3BE', l: 'Muhurtham' },
+      { c: '#DCD6F7', l: 'Valarpirai' },
+      { c: '#BDE8DD', l: 'Special' },
+      { c: DOT_BOXED.booked, l: 'Booked' },
+      { c: DOT_BOXED.partial, l: 'Partly booked' },
+      { c: DOT_BOXED.tentative, l: 'Tentative' },
+      { c: DOT_BOXED.blocked, l: 'Blocked' },
+    ];
+    return (
+      <View style={st.legendBoxed}>
+        {keys.map((k, i) => (
+          <View key={k.l} style={[st.legendItem, st.legendItemBoxed, { width: LEGEND_COLS[i % 4] }]}>
+            <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: k.c }} />
+            <Text style={[st.legendText, st.legendTextBoxed]} numberOfLines={1}>
+              {k.l}
+            </Text>
+          </View>
+        ))}
+      </View>
+    );
+  }
   const tints = [
     { c: D.muhurtham.bg, l: 'Muhurtham', square: true },
     { c: D.valarpirai.bg, l: 'Valarpirai', square: true },
@@ -240,11 +286,11 @@ export function CalendarLegend({ boxed }: { boxed?: boolean }) {
           <View
             style={
               t.square
-                ? { width: 12, height: 12, borderRadius: 4, backgroundColor: t.c, borderWidth: 1, borderColor: C.border }
+                ? { width: 12, height: 12, borderRadius: 4, backgroundColor: t.c, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.95)' }
                 : { width: 7, height: 7, borderRadius: 4, backgroundColor: t.c }
             }
           />
-          <Text style={boxed ? st.legendText : T.caption}>{t.l}</Text>
+          <Text style={st.legendText}>{t.l}</Text>
         </View>
       ))}
     </View>
@@ -267,7 +313,7 @@ export function MonthPicker({
     <BottomSheet visible={visible} onClose={onClose} title="Choose month">
       <View style={st.pickerYear}>
         <IconButton icon="chevron-back" size={40} onPress={() => setYear((y) => y - 1)} />
-        <Text style={T.section}>{year}</Text>
+        <Text style={st.monthBoxed}>{year}</Text>
         <IconButton icon="chevron-forward" size={40} onPress={() => setYear((y) => y + 1)} />
       </View>
       <View style={st.monthGrid}>
@@ -277,8 +323,8 @@ export function MonthPicker({
             <Touchable
               key={name}
               onPress={() => onPick({ y: year, m: i })}
-              style={[st.monthCell, on && { backgroundColor: C.primary, borderColor: C.primary }]}>
-              <Text style={[T.bodyMedium, on && { color: C.onPrimary }]}>{name.slice(0, 3)}</Text>
+              style={[st.monthCell, on && st.monthCellOn]}>
+              <Text style={[st.monthCellText, on && { color: '#FFFFFF', fontFamily: F.semibold }]}>{name.slice(0, 3)}</Text>
             </Touchable>
           );
         })}
@@ -287,85 +333,84 @@ export function MonthPicker({
   );
 }
 
+const SELECTED_GLOW =
+  'inset 0px 1px 0px rgba(255, 255, 255, 0.45), 0px 0px 0px 1px rgba(95, 140, 220, 0.35), 0px 0px 10px rgba(70, 125, 230, 0.5), 0px 3px 8px rgba(28, 72, 176, 0.25)';
+
 const st = StyleSheet.create({
   monthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   monthTitle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 8 },
+  monthPlain: { fontFamily: F.pageSerifBold, fontSize: 17, lineHeight: 22, color: G.ink },
   row: { flexDirection: 'row' },
   weekday: {
     flex: 1,
     textAlign: 'center',
     fontFamily: F.medium,
-    fontSize: 12,
-    color: C.textMuted,
-    paddingVertical: 8,
+    fontSize: 11,
+    color: G.muted,
+    paddingVertical: 7,
   },
-  cell: { flex: 1, alignItems: 'center', paddingVertical: 3, minHeight: 50 },
+  cell: { flex: 1, alignItems: 'center', paddingVertical: 3, minHeight: 46 },
   day: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  today: { borderWidth: 1.5, borderColor: C.primary },
-  dayText: { fontFamily: F.medium, fontSize: 15, color: C.text },
+  today: { borderWidth: 1.5, borderColor: G.blue },
+  daySelected: { backgroundColor: G.blue, borderWidth: 1.5, borderColor: 'rgba(255, 255, 255, 0.95)', boxShadow: SELECTED_GLOW },
+  dayText: { fontFamily: F.medium, fontSize: 13.5, color: G.ink },
   strike: { textDecorationLine: 'line-through', color: C.textMuted },
   dot: { width: 5, height: 5, borderRadius: 3, marginTop: 3 },
   legend: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 14, rowGap: 8, marginTop: 12 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendBoxed: {
+    ...glassSurface('rgba(255, 255, 255, 0.6)', 12, 'rgba(31, 58, 112, 0.05)'),
     flexDirection: 'row',
     flexWrap: 'wrap',
-    rowGap: 8,
-    marginTop: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#ECE3DA',
-    backgroundColor: C.surface,
+    rowGap: 10,
+    marginTop: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
-  legendItemBoxed: { width: '25%' },
-  legendText: { fontFamily: F.regular, fontSize: 10.5, color: C.textSecondary },
+  legendItemBoxed: { gap: 7 },
+  legendTextBoxed: { fontSize: 11.5, color: '#3A4258' },
+  legendText: { fontFamily: F.regular, fontSize: 10.5, color: G.muted },
 
   navBoxed: {
+    ...glassSurface('rgba(255, 255, 255, 0.72)', 16, 'rgba(31, 58, 112, 0.08)'),
     width: 34,
     height: 34,
-    borderRadius: 17,
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: '#ECE3DA',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0px 1px 3px rgba(87, 21, 44, 0.08)',
   },
-  monthBoxed: { fontFamily: F.pageSerifBold, fontSize: 19, lineHeight: 24, color: C.primary },
-  cellBoxed: { flex: 1, paddingHorizontal: 3, paddingVertical: 3 },
+  monthBoxed: { fontFamily: F.pageSerifBold, fontSize: 19.5, lineHeight: 25, letterSpacing: -0.3, color: G.ink },
+  cellBoxed: { flex: 1, paddingHorizontal: 3.5, paddingVertical: 3.5 },
   tile: {
-    height: 38,
-    borderRadius: 8,
+    height: 36,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#EDE5DD',
-    backgroundColor: C.surface,
+    borderColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: 'rgba(255, 255, 255, 0.66)',
     alignItems: 'center',
     justifyContent: 'center',
     paddingTop: 3,
+    boxShadow: 'inset 0px 1px 0px rgba(255, 255, 255, 1), 0px 2px 5px rgba(31, 58, 112, 0.06)',
   },
-  tileToday: { borderWidth: 1.5, borderColor: C.primary, backgroundColor: C.surface },
-  tileSelected: { backgroundColor: C.primary, borderColor: C.primary, boxShadow: '0px 2px 5px rgba(87, 21, 44, 0.3)' },
-  tileText: { fontFamily: F.regular, fontSize: 13.5, lineHeight: 17, color: C.text },
+  tileToday: { borderWidth: 2, borderColor: G.navy, backgroundColor: 'rgba(255, 255, 255, 0.85)' },
+  tileSelected: { borderWidth: 1.5, borderColor: 'rgba(255, 255, 255, 0.95)', boxShadow: SELECTED_GLOW },
+  tileText: { fontFamily: F.regular, fontSize: 13.5, lineHeight: 17, color: G.ink },
   tileDot: { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
   pickerYear: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  monthGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  monthGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   monthCell: {
+    ...glassSurface('rgba(255, 255, 255, 0.62)', 12, 'rgba(31, 58, 112, 0.05)'),
     width: '30%',
     flexGrow: 1,
-    minHeight: 48,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.surface,
+    minHeight: 42,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  monthCellOn: { backgroundColor: G.blue, boxShadow: SELECTED_GLOW },
+  monthCellText: { fontFamily: F.medium, fontSize: 13, color: G.ink },
 });

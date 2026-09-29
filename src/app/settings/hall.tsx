@@ -3,18 +3,18 @@ import { Image } from 'expo-image';
 import { useId, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View, type TextStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
+import { glassSurface, Sheen } from '@/components/glass';
+import { GlassBackdrop } from '@/components/glass-header';
 import { useToast } from '@/components/overlays';
-import { goBack, Touchable } from '@/components/primitives';
+import { goBack, ScrollFade, Touchable, useSmoothScroll } from '@/components/primitives';
 import { useStore } from '@/lib/store';
 import { appWidth, F } from '@/lib/theme';
 
-const PHOTO = require('../../../assets/images/hall/hall-photo.jpg');
-const PANEL_FLORAL = require('../../../assets/images/hall/panel-floral.png');
-const PAGE_FLORAL = require('../../../assets/images/hall/page-floral.png');
-const INFO_FLORAL = require('../../../assets/images/hall/info-floral.png');
-const OVERVIEW_SCENE = require('../../../assets/images/hall/overview-scene.png');
+const PHOTO = require('../../../assets/images/hall/hall-photo-glass.jpg');
+/** Misty mandap and seating, faded in from the left so it melts into the overview card's glass. */
+const OVERVIEW_SCENE = require('../../../assets/images/hall/overview-glass.png');
 
 /** Reference artboard width; `u()` maps its units to dp so the screen scales with the device. */
 const REF_W = 887;
@@ -22,18 +22,27 @@ const REF_W = 887;
 const SERIF_BASE = 0.8765;
 const SANS_BASE = 0.8638;
 
-const BG = '#FBF7F2';
-const BURGUNDY = '#6E0C28';
-const PANEL = '#6B0C28';
-const GOLD = '#B08A5A';
-const ICON = '#9E1257';
-const LABEL = '#6E6D76';
-const VALUE = '#111013';
+/** Blue glass palette shared with the tab screens. */
+const INK = '#131D38';
+const NAVY = '#1F3A70';
+const BLUE = '#2F63C0';
+const LINK = '#1F4488';
+const MUTED = '#5B6275';
+const LABEL = '#6E7385';
+
+/** Pastel icon tiles for the information rows, matched to the design reference. */
+const TONES = {
+  blue: { bg: ['#EAF2FE', '#D3E4FB'], fg: BLUE },
+  lilac: { bg: ['#F3EEFD', '#E3D8F8'], fg: '#7A3FD0' },
+  mint: { bg: ['#E8F8F2', '#CFEFE3'], fg: '#1E8A80' },
+  peach: { bg: ['#FFF3E8', '#FDE1CB'], fg: '#E8732A' },
+} as const;
 
 export default function HallDetailsScreen() {
   const { hall } = useStore();
   const toast = useToast();
   const insets = useSafeAreaInsets();
+  const { scrollRef, rootRef, scrolled, onScroll } = useSmoothScroll<ScrollView>();
   const { width } = useWindowDimensions();
   const k = appWidth(width) / REF_W;
   const u = (n: number) => n * k;
@@ -61,8 +70,7 @@ export default function HallDetailsScreen() {
             top: u(baseline) - fs * (serif ? SERIF_BASE : SANS_BASE),
             fontSize: fs,
             lineHeight: fs,
-            // PT Serif runs ~5% wider than the reference face; tighten to match its measure.
-            letterSpacing: serif ? u(-1.3) : undefined,
+            letterSpacing: serif ? u(-0.9) : undefined,
           },
         ]}>
         {text}
@@ -70,67 +78,77 @@ export default function HallDetailsScreen() {
     );
   };
 
-  const rows: { icon: ReactNode; label: string; value: string }[] = [
-    { icon: <BuildingIcon color={ICON} width={u(38)} />, label: 'Organisation', value: hall.org },
-    { icon: <Ionicons name="person-outline" size={u(44)} color={ICON} />, label: 'Your role', value: hall.role },
-    { icon: <Ionicons name="location-outline" size={u(48)} color={ICON} />, label: 'Address', value: hall.address },
+  /** Two-tone serif heading: navy lead word, blue second word. */
+  const heading = (lead: string, rest: string, left: number, baseline: number, size: number) =>
+    line(
+      <>
+        {lead} <Text style={{ color: BLUE }}>{rest}</Text>
+      </>,
+      left,
+      baseline,
+      size,
+      { fontFamily: F.pageSerifBold, color: INK },
+      true,
+    );
+
+  const rows: { icon: ReactNode; tone: keyof typeof TONES; label: string; value: string }[] = [
     {
-      icon: <MaterialCommunityIcons name="phone-in-talk-outline" size={u(46)} color={ICON} />,
+      icon: <MaterialCommunityIcons name="domain" size={u(46)} color={TONES.blue.fg} />,
+      tone: 'blue',
+      label: 'Organisation',
+      value: hall.org,
+    },
+    {
+      icon: <Ionicons name="person-outline" size={u(42)} color={TONES.lilac.fg} />,
+      tone: 'lilac',
+      label: 'Your role',
+      value: hall.role,
+    },
+    {
+      icon: <Ionicons name="location-outline" size={u(46)} color={TONES.mint.fg} />,
+      tone: 'mint',
+      label: 'Address',
+      value: hall.address,
+    },
+    {
+      icon: <MaterialCommunityIcons name="phone-in-talk-outline" size={u(44)} color={TONES.peach.fg} />,
+      tone: 'peach',
       label: 'Contact',
       value: hall.phone,
     },
   ];
 
-  const card = { left: u(42), width: u(804), borderRadius: u(30) };
+  const card = { left: u(38), width: u(812) };
 
   return (
-    <View style={st.screen}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: insets.top }}>
-        <View style={{ height: u(1740) + insets.bottom }}>
-          <Image
-            source={PAGE_FLORAL}
-            pointerEvents="none"
-            style={{ position: 'absolute', left: u(600), top: 0, width: u(287), height: u(345) }}
-          />
-
+    <View ref={rootRef} style={st.screen}>
+      <GlassBackdrop />
+      <ScrollFade faded={scrolled}>
+      <ScrollView
+        ref={scrollRef}
+        scrollEventThrottle={16}
+        onScroll={onScroll}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: insets.top }}>
+        <View style={{ height: u(1720) + insets.bottom }}>
           {/* Header */}
           <Touchable
             onPress={goBack}
             accessibilityRole="button"
             accessibilityLabel="Back"
-            hitSlop={12}
-            style={{ position: 'absolute', left: u(50), top: u(38), width: u(48), height: u(46) }}>
-            <Svg width="100%" height="100%" viewBox="50 38 48 46">
-              <Path
-                d="M92 61H58M74 45L57.5 61L74 77"
-                stroke="#5E0620"
-                strokeWidth={5.5}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="none"
-              />
-            </Svg>
+            hitSlop={8}
+            style={[st.center, glassSurface('rgba(255, 255, 255, 0.55)', u(38)), st.abs, { left: u(42), top: u(42), width: u(76), height: u(76) }]}>
+            <Sheen radius={u(38)} strength={0.6} />
+            <Ionicons name="arrow-back" size={u(38)} color={BLUE} />
           </Touchable>
-          {line(
-            <>
-              Hall <Text style={{ color: GOLD }}>Details</Text>
-            </>,
-            135,
-            81,
-            51.4,
-            { fontFamily: F.pageSerifBold, color: BURGUNDY },
-            true,
-          )}
+          {heading('Hall', 'Details', 145, 101, 56)}
 
-          {/* Hero: hall photo over a burgundy name panel */}
-          <View style={[st.card, st.hero, card, { top: u(135), height: u(501) }]}>
-            <Image source={PHOTO} contentFit="cover" style={{ width: '100%', height: u(312) }} />
-            <View style={{ flex: 1, backgroundColor: PANEL }}>
-              <Image
-                source={PANEL_FLORAL}
-                pointerEvents="none"
-                style={{ position: 'absolute', left: u(478), top: 0, width: u(326), height: u(189) }}
-              />
+          {/* Hero: hall photo over a frosted name panel */}
+          <View style={[st.abs, card, glassSurface('rgba(240, 246, 255, 0.5)', u(36)), { top: u(135), height: u(486) }]}>
+            <Sheen radius={u(36)} strength={0.45} />
+            <Waves style={{ left: u(380), top: u(330), width: u(430), height: u(154) }} />
+            <View style={[st.abs, st.photo, { left: u(2), top: u(2), right: u(2), height: u(314), borderRadius: u(34) }]}>
+              <Image source={PHOTO} contentFit="cover" style={StyleSheet.absoluteFill} />
             </View>
 
             <Touchable
@@ -138,153 +156,177 @@ export default function HallDetailsScreen() {
               accessibilityRole="button"
               accessibilityLabel="Change photo"
               style={[
-                st.photoPill,
-                { left: u(543), top: u(225), width: u(240), height: u(66), borderRadius: u(33), gap: u(16) },
+                st.abs,
+                st.pill,
+                glassSurface('rgba(255, 255, 255, 0.9)', u(34)),
+                { left: u(552), top: u(225), width: u(238), height: u(68), gap: u(14) },
               ]}>
-              <Ionicons name="camera-outline" size={u(34)} color="#5E0B20" />
-              <Text style={[st.pillText, { color: '#5E0B20', fontSize: u(22.5), lineHeight: u(28) }]}>Change Photo</Text>
+              <Ionicons name="camera-outline" size={u(32)} color={LINK} />
+              <Text style={[st.pillText, { color: LINK, fontSize: u(21), lineHeight: u(28) }]}>Change Photo</Text>
             </Touchable>
 
-            <View style={{ position: 'absolute', left: u(42), top: u(376) }}>
-              <BuildingIcon color="#F7F4F5" width={u(62)} />
+            <View
+              style={[
+                st.abs,
+                st.center,
+                glassSurface('rgba(255, 255, 255, 0.55)', u(24)),
+                { left: u(32), top: u(348), width: u(105), height: u(107) },
+              ]}>
+              <Sheen radius={u(24)} strength={0.6} />
+              <MaterialCommunityIcons name="domain" size={u(66)} color={BLUE} />
             </View>
-            {line(hall.name, 140, 399, 44.3, { fontFamily: F.pageSerifBold, color: '#FFFFFF' }, true, 250)}
-            {line(hall.org, 140, 451, 29.5, { fontFamily: F.regular, color: '#D3A493' }, false, 250)}
+            {line(hall.name, 162, 393, 40, { fontFamily: F.pageSerifBold, color: INK }, true, 262)}
+            {line(hall.org, 162, 435, 25, { fontFamily: F.regular, color: MUTED }, false, 262)}
 
             <Touchable
               onPress={() => toast('Editing hall details is coming soon')}
               accessibilityRole="button"
               accessibilityLabel="Edit details"
               style={[
-                st.editPill,
-                { left: u(572), top: u(381), width: u(202), height: u(67), borderRadius: u(33.5), gap: u(14) },
+                st.abs,
+                st.pill,
+                glassSurface('rgba(236, 243, 254, 0.78)', u(34)),
+                { left: u(560), top: u(375), width: u(220), height: u(68), gap: u(12) },
               ]}>
-              <MaterialCommunityIcons name="pencil-outline" size={u(32)} color="#E2B99B" />
-              <Text style={[st.pillText, { color: '#EACBB2', fontSize: u(22), lineHeight: u(28) }]}>Edit Details</Text>
+              <MaterialCommunityIcons name="pencil-outline" size={u(28)} color={NAVY} />
+              <Text style={[st.pillText, { color: NAVY, fontSize: u(20), lineHeight: u(26) }]}>Edit Details</Text>
+              <Ionicons name="arrow-forward" size={u(24)} color={NAVY} />
             </Touchable>
           </View>
 
           {/* Hall information */}
-          <View style={[st.card, st.infoCard, card, { top: u(660), height: u(675) }]}>
-            <Image
-              source={INFO_FLORAL}
-              pointerEvents="none"
-              style={{ position: 'absolute', left: u(628), top: 0, width: u(175), height: u(184) }}
-            />
-            {line('Hall Information', 40, 77, 42.9, { fontFamily: F.pageSerifBold, color: '#7A0E30' }, true)}
-            <Ornament left={u(40)} top={u(100)} width={u(180)} />
+          <View style={[st.abs, card, glassSurface('rgba(244, 248, 255, 0.52)', u(36)), { top: u(650), height: u(650) }]}>
+            <Sheen radius={u(36)} strength={0.4} height="20%" />
+            <Waves style={{ left: u(520), top: 0, width: u(292), height: u(150) }} flip />
+            {heading('Hall', 'Information', 44, 70, 46)}
+            <Underline left={u(44)} top={u(88)} width={u(210)} />
             {rows.map((r, i) => {
-              const top = 150 + i * 133.3;
+              const tone = TONES[r.tone];
               return (
-                <View key={r.label}>
-                  <View style={[st.iconBox, { left: u(40), top: u(top), width: u(83), height: u(82), borderRadius: u(20) }]}>
+                <View
+                  key={r.label}
+                  style={[
+                    st.abs,
+                    glassSurface('rgba(255, 255, 255, 0.42)', u(26)),
+                    { left: u(20), right: u(20), top: u(124 + i * 129.5), height: u(120) },
+                  ]}>
+                  <View style={[st.abs, st.center, st.tile, { left: u(25), top: u(15), width: u(94), height: u(88), borderRadius: u(18) }]}>
+                    <TileFill from={tone.bg[0]} to={tone.bg[1]} />
                     {r.icon}
                   </View>
-                  {line(r.label, 160, top + 27, 24.5, { fontFamily: F.regular, color: LABEL }, false, 20)}
-                  {line(r.value, 160, top + 67, 30, { fontFamily: F.regular, color: VALUE }, false, 20)}
-                  {i < rows.length - 1 ? (
-                    <View style={[st.sep, { left: u(40), right: u(39), top: u(top + 105), height: u(1.6) }]} />
-                  ) : null}
+                  {line(r.label, 154, 48, 22.5, { fontFamily: F.regular, color: LABEL }, false, 20)}
+                  {line(r.value, 154, 86, 28, { fontFamily: F.medium, color: INK }, false, 20)}
                 </View>
               );
             })}
           </View>
 
           {/* Hall overview */}
-          <View style={[st.card, st.overviewCard, card, { top: u(1360), height: u(320) }]}>
+          <View style={[st.abs, card, glassSurface('rgba(244, 248, 255, 0.52)', u(36)), { top: u(1330), height: u(338), overflow: 'hidden' }]}>
             <Image
               source={OVERVIEW_SCENE}
               pointerEvents="none"
-              style={{ position: 'absolute', left: u(378), top: u(1), width: u(425), height: u(319) }}
+              style={{ position: 'absolute', right: u(2), top: u(4), width: u(416), height: u(330) }}
             />
-            {line('Hall Overview', 45, 80, 42.9, { fontFamily: F.pageSerifBold, color: '#A0115A' }, true)}
-            <Ornament left={u(45)} top={u(105)} width={u(180)} />
-            <View style={[st.capBox, { left: u(45), top: u(160), width: u(112), height: u(114), borderRadius: u(26) }]}>
-              <MaterialCommunityIcons name="account-group-outline" size={u(72)} color="#9A1649" />
+            <Sheen radius={u(36)} strength={0.4} height="30%" />
+            <Waves style={{ left: u(250), top: u(20), width: u(560), height: u(300) }} flip />
+            {heading('Hall', 'Overview', 44, 78, 46)}
+            <Underline left={u(44)} top={u(96)} width={u(210)} />
+            <View style={[st.abs, st.center, st.tile, { left: u(44), top: u(162), width: u(114), height: u(116), borderRadius: u(26) }]}>
+              <TileFill from={TONES.lilac.bg[0]} to={TONES.lilac.bg[1]} />
+              <Ionicons name="people-outline" size={u(64)} color={TONES.lilac.fg} />
             </View>
-            {line('Capacity', 197, 189, 24.5, { fontFamily: F.regular, color: '#75717A' })}
-            {line(hall.capacity, 196, 240, 42.5, { fontFamily: F.pageSerifBold, color: BURGUNDY }, true, 380)}
+            {line('Capacity', 198, 192, 22.5, { fontFamily: F.regular, color: LABEL })}
+            {line(hall.capacity, 198, 248, 42, { fontFamily: F.pageSerifBold, color: INK }, true, 400)}
           </View>
         </View>
       </ScrollView>
+      </ScrollFade>
     </View>
   );
 }
 
-/** White tower + annexe glyph used for the hall; drawn on a 62×66 grid. */
-function BuildingIcon({ color, width }: { color: string; width: number }) {
-  const win = (x: number, y: number, w = 5, h = 5) => `M${x} ${y}h${w}v${h}h${-w}Z`;
-  const tower = [7, 16.5, 26].flatMap((x) => [6, 15, 24, 33, 42].map((y) => win(x, y)));
-  const annexe = [45, 53].flatMap((x) => [30, 38, 46].map((y) => win(x, y, 4, 4)));
-  const d = [
-    'M0 0H38V66H0Z',
-    ...tower,
-    win(15, 52, 8, 14),
-    'M40 23H62V66H40Z',
-    ...annexe,
-  ].join('');
+/** SVG ids must be unique per document on web; React ids contain characters `url(#…)` rejects. */
+function useSvgId(prefix: string) {
+  return prefix + useId().replace(/[^a-zA-Z0-9]/g, '');
+}
+
+/** Soft pastel gradient behind an icon tile. */
+function TileFill({ from, to }: { from: string; to: string }) {
+  const id = useSvgId('tf');
   return (
-    <Svg width={width} height={width * (66 / 62)} viewBox="0 0 62 66">
-      <Path d={d} fill={color} fillRule="evenodd" />
-    </Svg>
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <Svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <Defs>
+          <LinearGradient id={id} x1="0" y1="0" x2="0.6" y2="1">
+            <Stop offset="0" stopColor={from} />
+            <Stop offset="1" stopColor={to} />
+          </LinearGradient>
+        </Defs>
+        <Rect width={100} height={100} fill={`url(#${id})`} />
+      </Svg>
+    </View>
   );
 }
 
-/** Gold rule with a hollow diamond, set under section titles. */
-function Ornament({ left, top, width }: { left: number; top: number; width: number }) {
-  const id = `orn-${useId().replace(/:/g, '')}`;
+/** Blue accent rule under section titles: a solid bar, a dot, then a hairline fading out. */
+function Underline({ left, top, width }: { left: number; top: number; width: number }) {
+  const id = useSvgId('ul');
   return (
     <Svg
       width={width}
-      height={(width * 16) / 180}
-      viewBox="0 0 180 16"
+      height={(width * 10) / 210}
+      viewBox="0 0 210 10"
       style={{ position: 'absolute', left, top }}
       pointerEvents="none">
       <Defs>
-        <LinearGradient id={`${id}-l`} x1="0" y1="0" x2="1" y2="0">
-          <Stop offset="0" stopColor="#C9A27A" stopOpacity={0.55} />
-          <Stop offset="1" stopColor="#C9A27A" stopOpacity={1} />
+        <LinearGradient id={`${id}a`} x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0" stopColor={BLUE} />
+          <Stop offset="1" stopColor="#6FA2EE" />
         </LinearGradient>
-        <LinearGradient id={`${id}-r`} x1="0" y1="0" x2="1" y2="0">
-          <Stop offset="0" stopColor="#C9A27A" stopOpacity={0.7} />
-          <Stop offset="1" stopColor="#C9A27A" stopOpacity={0} />
+        <LinearGradient id={`${id}b`} x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0" stopColor="#8DB4F0" stopOpacity={0.9} />
+          <Stop offset="1" stopColor="#8DB4F0" stopOpacity={0} />
         </LinearGradient>
       </Defs>
-      <Rect x="0" y="7.2" width="86" height="1.8" fill={`url(#${id}-l)`} />
-      <Path d="M99.5 2L105.5 8L99.5 14L93.5 8Z" stroke="#BD936A" strokeWidth={2.2} fill="none" />
-      <Rect x="112" y="7.2" width="68" height="1.8" fill={`url(#${id}-r)`} />
+      <Rect x={0} y={3.3} width={90} height={3.4} rx={1.7} fill={`url(#${id}a)`} />
+      <Circle cx={95} cy={5} r={3.6} fill={BLUE} />
+      <Rect x={101} y={4.2} width={109} height={1.6} fill={`url(#${id}b)`} />
     </Svg>
   );
 }
 
-const shadow = '0px 6px 18px rgba(120, 80, 60, 0.10)';
+/** Faint white light-trails drawn across a corner of a glass card. */
+function Waves({ style, flip }: { style: { left: number; top: number; width: number; height: number }; flip?: boolean }) {
+  return (
+    <View pointerEvents="none" style={[st.abs, style, flip && { transform: [{ scaleY: -1 }] }]}>
+      <Svg width="100%" height="100%" viewBox="0 0 400 150" preserveAspectRatio="none">
+        {[0, 10, 20, 32].map((o, i) => (
+          <Path
+            key={o}
+            d={`M0 ${150 - o}C120 ${140 - o} 220 ${70 - o} 400 ${20 - o * 0.6}`}
+            stroke="#FFFFFF"
+            strokeOpacity={0.5 - i * 0.1}
+            strokeWidth={1.4}
+            fill="none"
+          />
+        ))}
+      </Svg>
+    </View>
+  );
+}
 
 const st = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: BG },
-  card: { position: 'absolute', boxShadow: shadow },
-  hero: { overflow: 'hidden', backgroundColor: PANEL },
-  infoCard: { overflow: 'hidden', backgroundColor: '#FEFDFB', borderWidth: 1, borderColor: '#EFE8E2' },
-  overviewCard: { overflow: 'hidden', backgroundColor: '#FCF6F7', borderWidth: 1, borderColor: '#EFE6E4' },
-  photoPill: {
-    position: 'absolute',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(252, 238, 240, 0.96)',
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-  },
-  editPill: {
-    position: 'absolute',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: PANEL,
-    borderWidth: 1.5,
-    borderColor: '#DDAB8F',
-  },
+  screen: { flex: 1, backgroundColor: '#E6EEF9' },
+  abs: { position: 'absolute' },
+  center: { alignItems: 'center', justifyContent: 'center' },
+  photo: { overflow: 'hidden', boxShadow: '0px 6px 16px rgba(31, 58, 112, 0.12)' },
+  pill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   pillText: { fontFamily: F.medium },
-  iconBox: { position: 'absolute', backgroundColor: '#FCEEF0', alignItems: 'center', justifyContent: 'center' },
-  sep: { position: 'absolute', backgroundColor: '#EEE7E1' },
-  capBox: { position: 'absolute', backgroundColor: '#F9E7EA', alignItems: 'center', justifyContent: 'center' },
+  tile: {
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+    boxShadow: 'inset 0px 1px 0px rgba(255, 255, 255, 1), 0px 0px 10px rgba(255, 255, 255, 0.8), 0px 4px 10px rgba(31, 58, 112, 0.08)',
+  },
 });

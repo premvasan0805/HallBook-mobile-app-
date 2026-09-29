@@ -5,9 +5,11 @@
   "dependencies": {
     "@expo-google-fonts/cormorant-garamond": "^0.4.1",
     "@expo-google-fonts/inter": "^0.4.2",
+    "@expo-google-fonts/lato": "^0.4.1",
     "@expo-google-fonts/pt-serif": "^0.4.1",
     "@expo/ui": "~57.0.19",
     "@expo/vector-icons": "^15.0.2",
+    "@react-native-masked-view/masked-view": "0.3.2",
     "expo": "~57.0.24",
     "expo-constants": "~57.0.19",
     "expo-device": "~57.0.2",

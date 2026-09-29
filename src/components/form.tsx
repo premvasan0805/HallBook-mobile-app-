@@ -2,32 +2,51 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState, type ReactNode } from 'react';
 import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 
+import { glassSurface, GlossTile, GradientFill, Sheen } from '@/components/glass';
 import { Touchable, type IconName } from '@/components/primitives';
-import { C, F, noOutline, radius, T } from '@/lib/theme';
+import { useInPopup } from '@/components/sheet-context';
+import { C, F, G, noOutline, radius, T } from '@/lib/theme';
+
+/** Frosted input surface for popups. */
+const GLASS_INPUT = glassSurface('rgba(255, 255, 255, 0.66)', 12, 'rgba(31, 58, 112, 0.05)');
 
 export function TextField({
   label,
   hint,
   error,
   prefix,
+  icon,
+  right,
   multiline,
   style,
   ...props
-}: TextInputProps & { label?: string; hint?: string; error?: string; prefix?: string }) {
+}: TextInputProps & {
+  label?: string;
+  hint?: string;
+  error?: string;
+  prefix?: string;
+  /** Leading glyph inside the field. */
+  icon?: ReactNode;
+  /** Trailing glyph inside the field. */
+  right?: ReactNode;
+}) {
   const [focus, setFocus] = useState(false);
+  const popup = useInPopup();
   return (
-    <View style={{ gap: 6 }}>
-      {label ? <Text style={st.label}>{label}</Text> : null}
+    <View style={{ gap: popup ? 5 : 6 }}>
+      {label ? <Text style={[st.label, popup && st.gLabel]}>{label}</Text> : null}
       <View
         style={[
           st.inputWrap,
-          focus && { borderColor: C.primary, backgroundColor: C.surface },
+          popup && st.gInput,
+          focus && (popup ? st.gFocus : { borderColor: C.primary, backgroundColor: C.surface }),
           !!error && { borderColor: C.danger },
-          multiline && { minHeight: 88, alignItems: 'flex-start' },
+          multiline && { minHeight: popup ? 76 : 88, alignItems: 'flex-start' },
         ]}>
-        {prefix ? <Text style={st.prefix}>{prefix}</Text> : null}
+        {icon ? <View style={[st.fieldIcon, multiline && { justifyContent: 'flex-start', paddingTop: popup ? 10 : 12 }]}>{icon}</View> : null}
+        {prefix ? <Text style={[st.prefix, popup && { color: G.muted, fontSize: 13.5 }]}>{prefix}</Text> : null}
         <TextInput
-          placeholderTextColor={C.textMuted}
+          placeholderTextColor={popup ? G.placeholder : C.textMuted}
           multiline={multiline}
           onFocus={(e) => {
             setFocus(true);
@@ -37,14 +56,15 @@ export function TextField({
             setFocus(false);
             props.onBlur?.(e);
           }}
-          style={[st.input, multiline && { textAlignVertical: 'top', paddingTop: 12 }, style]}
+          style={[st.input, popup && st.gInputText, multiline && { textAlignVertical: 'top', paddingTop: popup ? 10 : 12 }, style]}
           {...props}
         />
+        {right ? <View style={st.fieldRight}>{right}</View> : null}
       </View>
       {error ? (
         <Text style={[T.caption, { color: C.danger }]}>{error}</Text>
       ) : hint ? (
-        <Text style={T.caption}>{hint}</Text>
+        <Text style={[T.caption, popup && { color: G.muted, fontSize: 11 }]}>{hint}</Text>
       ) : null}
     </View>
   );
@@ -61,16 +81,17 @@ export function SearchBar({
   placeholder: string;
   right?: ReactNode;
 }) {
+  const popup = useInPopup();
   return (
     <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-      <View style={st.search}>
-        <Ionicons name="search-outline" size={18} color={C.textMuted} />
+      <View style={[st.search, popup && st.gSearch]}>
+        <Ionicons name="search-outline" size={popup ? 16 : 18} color={popup ? G.blue : C.textMuted} />
         <TextInput
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor={C.textMuted}
-          style={st.searchInput}
+          placeholderTextColor={popup ? G.placeholder : C.textMuted}
+          style={[st.searchInput, popup && st.gInputText]}
           returnKeyType="search"
         />
         {value ? (
@@ -96,6 +117,30 @@ export function SegmentedTabs<K extends string>({
   onChange: (k: K) => void;
   variant?: 'solid' | 'soft';
 }) {
+  const popup = useInPopup();
+  if (popup) {
+    return (
+      <View style={[st.tabs, st.gTabs]}>
+        {options.map((o) => {
+          const on = o.key === value;
+          return (
+            <Touchable
+              key={o.key}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: on }}
+              onPress={() => onChange(o.key)}
+              style={[st.tab, st.gTab, on && st.gTabOn]}>
+              {on ? <GradientFill from={G.gradFrom} to={G.gradTo} radius={12} horizontal /> : null}
+              {on ? <Sheen radius={12} strength={0.4} height="50%" /> : null}
+              <Text numberOfLines={1} style={[st.gTabText, on && { color: '#FFFFFF', fontFamily: F.semibold }]}>
+                {o.label}
+              </Text>
+            </Touchable>
+          );
+        })}
+      </View>
+    );
+  }
   return (
     <View style={st.tabs}>
       {options.map((o) => {
@@ -130,15 +175,38 @@ export function Chip({
   active,
   onPress,
   icon,
+  glyph,
   tint,
+  highlight,
 }: {
   label: string;
   active?: boolean;
   onPress?: () => void;
   icon?: IconName;
+  /** Custom leading glyph; receives whether the chip is selected so it can switch colour. */
+  glyph?: (active: boolean) => ReactNode;
   /** Optional dot colour shown before the label. */
   tint?: string;
+  /** Popup only: blue outline and glow for a suggested (not selected) choice. */
+  highlight?: boolean;
 }) {
+  const popup = useInPopup();
+  if (popup) {
+    return (
+      <Touchable
+        onPress={onPress}
+        accessibilityState={{ selected: active }}
+        style={[st.chip, st.gChip, highlight && !active && st.gChipHi, active && st.gChipOn]}>
+        {active ? <GradientFill from={G.gradFrom} to={G.gradTo} radius={17} /> : null}
+        {active ? <Sheen radius={17} strength={0.35} height="50%" /> : null}
+        {tint ? <View style={[st.chipDot, { backgroundColor: tint }]} /> : null}
+        {glyph ? glyph(!!active) : icon ? <Ionicons name={icon} size={16} color={active ? '#FFFFFF' : G.navy} /> : null}
+        <Text style={[st.gChipText, highlight && { color: G.deep, fontFamily: F.semibold }, active && { color: '#FFFFFF', fontFamily: F.semibold }]}>
+          {label}
+        </Text>
+      </Touchable>
+    );
+  }
   return (
     <Touchable
       onPress={onPress}
@@ -172,6 +240,33 @@ export function OptionCard({
   icon?: IconName;
   right?: ReactNode;
 }) {
+  const popup = useInPopup();
+  if (popup) {
+    return (
+      <Touchable
+        disabled={disabled}
+        onPress={onPress}
+        accessibilityState={{ selected, disabled }}
+        style={[st.option, st.gOption, selected && st.gFocus]}>
+        <Sheen radius={12} strength={0.45} height="45%" />
+        {icon ? (
+          <GlossTile from={selected ? G.gradFrom : '#EEF5FE'} to={selected ? G.gradTo : '#D3E4FB'} radius={10} style={st.gOptionIcon}>
+            <Ionicons name={icon} size={17} color={selected ? '#FFFFFF' : G.blue} />
+          </GlossTile>
+        ) : null}
+        <View style={{ flex: 1 }}>
+          <Text style={[st.gOptionTitle, selected && { color: G.deep, fontFamily: F.semibold }]}>{title}</Text>
+          {subtitle ? <Text style={st.gOptionSub}>{subtitle}</Text> : null}
+        </View>
+        {right}
+        {action ? (
+          <Ionicons name="chevron-forward" size={15} color={G.navy} />
+        ) : (
+          <Ionicons name={selected ? 'radio-button-on' : 'radio-button-off'} size={18} color={selected ? G.blue : '#9AA2B5'} />
+        )}
+      </Touchable>
+    );
+  }
   return (
     <Touchable
       disabled={disabled}
@@ -269,6 +364,27 @@ const st = StyleSheet.create({
     backgroundColor: C.surface,
   },
   optionOn: { borderColor: C.primary, backgroundColor: C.primarySoft },
+
+  // Blue glass variants used inside popups.
+  fieldIcon: { marginRight: 11, alignSelf: 'stretch', justifyContent: 'center' },
+  fieldRight: { marginLeft: 8 },
+  gLabel: { fontFamily: F.medium, fontSize: 12.5, color: G.ink },
+  gInput: { ...GLASS_INPUT, minHeight: 42, paddingHorizontal: 14 },
+  gFocus: { borderColor: G.focusBorder, boxShadow: G.focusGlow },
+  gInputText: { fontSize: 13.5, color: G.ink, paddingVertical: 10 },
+  gSearch: { ...GLASS_INPUT, height: 40, paddingHorizontal: 13 },
+  gTabs: { ...glassSurface('rgba(255, 255, 255, 0.5)', 14, 'rgba(31, 58, 112, 0.04)'), padding: 2 },
+  gTab: { minHeight: 32, borderRadius: 12 },
+  gTabOn: { borderWidth: 1.5, borderColor: 'rgba(255, 255, 255, 0.95)', boxShadow: G.buttonGlow },
+  gTabText: { fontFamily: F.regular, fontSize: 12, color: G.ink },
+  gChip: { ...glassSurface('rgba(255, 255, 255, 0.6)', 17, 'rgba(31, 58, 112, 0.05)'), minHeight: 34, paddingHorizontal: 14, gap: 8 },
+  gChipOn: { borderColor: 'rgba(255, 255, 255, 0.95)', boxShadow: G.buttonGlow },
+  gChipHi: { borderColor: G.focusBorder, backgroundColor: 'rgba(236, 244, 255, 0.8)', boxShadow: G.focusGlow },
+  gChipText: { fontFamily: F.regular, fontSize: 13, color: G.ink },
+  gOption: { ...GLASS_INPUT, borderRadius: 12, minHeight: 52, padding: 9, gap: 11, borderWidth: 1.5 },
+  gOptionIcon: { width: 34, height: 34 },
+  gOptionTitle: { fontFamily: F.medium, fontSize: 13, color: G.ink },
+  gOptionSub: { fontFamily: F.regular, fontSize: 11, color: G.muted },
   optionIcon: {
     width: 38,
     height: 38,

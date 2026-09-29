@@ -2,21 +2,16 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useState, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
 
-import {
-  BrandButton,
-  BrandFloral,
-  BrandPageHeader,
-  GOLD,
-  GoldRule,
-  SEGMENT_META,
-  SLOT_META,
-  type MciName,
-} from '@/components/brand-page';
+import { BrandButton, GOLD, type MciName } from '@/components/brand-page';
 import { TextField } from '@/components/form';
+import { glassSurface, GlossTile, GradientFill, Sheen } from '@/components/glass';
+import { GlassBackdrop, GlassPageHeader } from '@/components/glass-header';
 import { BottomSheet, useToast } from '@/components/overlays';
-import { PrimaryButton, Touchable } from '@/components/primitives';
-import { fmtClock, inr, toNum } from '@/lib/format';
+import { PrimaryButton, ScrollFade, Touchable, useSmoothScroll } from '@/components/primitives';
+import { inr, toNum } from '@/lib/format';
 import {
   CATEGORY_LABEL,
   CATEGORY_ORDER,
@@ -28,9 +23,10 @@ import {
   useStore,
   type Category,
   type Segment,
+  type SegmentKey,
   type SlotKey,
 } from '@/lib/store';
-import { C, elevation, F, noOutline, radius, T } from '@/lib/theme';
+import { C, elevation, F, noOutline, radius } from '@/lib/theme';
 
 /** 12-hour clock time as typed in the timing sheet, e.g. 6:00 or 06:00. */
 const TIME_RE = /^(0?[1-9]|1[0-2]):[0-5]\d$/;
@@ -50,6 +46,40 @@ function to24(time: string, ap: Meridiem) {
   const h24 = (h % 12) + (ap === 'PM' ? 12 : 0);
   return `${String(h24).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
+
+/** Blue glass palette shared with the tab screens. */
+const INK = '#131D38';
+const NAVY = '#1F3A70';
+const BLUE = '#2F63C0';
+const MUTED = '#5B6275';
+
+/** Pastel gradients for icon tiles and bubbles. */
+const TILE = {
+  blue: ['#EEF5FE', '#D3E4FB'],
+  lilac: ['#F5F0FD', '#E3D8F8'],
+  mint: ['#EAF8F2', '#CFEFE3'],
+  sun: ['#FFF8E8', '#FCE9C4'],
+  rose: ['#FEF0F3', '#FAD9E0'],
+  sky: ['#EAF8FB', '#CDECF3'],
+} as const;
+
+type Look = { icon: MciName | 'moon-outline'; fg: string; tile: readonly [string, string] };
+
+const MOON: Look = { icon: 'moon-outline', fg: '#6A45B0', tile: TILE.lilac };
+
+/** Line-art sky icon and tone per booking slot. */
+const SLOT_LOOK: Record<SlotKey, Look> = {
+  full: { icon: 'white-balance-sunny', fg: '#E0901C', tile: TILE.sun },
+  first: { icon: 'weather-sunset-up', fg: '#C2334F', tile: TILE.rose },
+  second: MOON,
+  early: { icon: 'weather-sunset-up', fg: '#1F8FA6', tile: TILE.sky },
+};
+
+const SEGMENT_LOOK: Record<SegmentKey, Look> = {
+  early: { icon: 'weather-sunset-up', fg: '#E0901C', tile: TILE.sun },
+  late: { icon: 'white-balance-sunny', fg: '#E0901C', tile: TILE.sun },
+  evening: MOON,
+};
 
 const CAT_DOT: Record<Category, string> = {
   muhurthamWeekend: '#C8963E',
@@ -81,6 +111,7 @@ const groupINR = (value: string) => {
 export default function PricingScreen() {
   const { segments, rates, updateSegment, updateRate } = useStore();
   const toast = useToast();
+  const insets = useSafeAreaInsets();
   const [slot, setSlot] = useState<SlotKey>('full');
   const [editSeg, setEditSeg] = useState<Segment | null>(null);
   const [editRate, setEditRate] = useState<Category | null>(null);
@@ -101,73 +132,87 @@ export default function PricingScreen() {
   };
 
   const segValid = TIME_RE.test(start) && TIME_RE.test(end);
+  const { scrollRef, rootRef, scrolled, onScroll } = useSmoothScroll<ScrollView>();
 
   return (
-    <View style={st.screen}>
-      <BrandFloral />
-      <BrandPageHeader title="Timings &" accent="Rates" />
+    <View ref={rootRef} style={st.screen}>
+      <GlassBackdrop />
+      <GlassPageHeader lead="Timings &" accent="Rates" />
 
-      <ScrollView contentContainerStyle={st.body} showsVerticalScrollIndicator={false}>
+      <ScrollFade faded={scrolled}>
+      <ScrollView
+        ref={scrollRef}
+        scrollEventThrottle={16}
+        onScroll={onScroll}
+        contentContainerStyle={[st.body, { paddingBottom: insets.bottom + 28 }]}
+        showsVerticalScrollIndicator={false}>
         {/* Booking timings */}
         <Section
-          icon={<Ionicons name="time-outline" size={21} color={C.primary} />}
+          icon={<Ionicons name="time-outline" size={21} color={BLUE} />}
+          tile={TILE.blue}
           title="Booking Timings"
           sub="Standard booking slots for the hall.">
-          <View style={st.list}>
-            {SLOT_ORDER.map((k, i) => {
-              const m = SLOT_META[k];
-              return (
-                <View key={k} style={[st.row, i > 0 && st.rowRule]}>
-                  <Bubble icon={m.icon} fg={m.fg} bg={m.bg} />
-                  <Text style={st.rowLabel}>{SLOT_LABEL[k]}</Text>
-                  <Text style={st.rowTime}>{slotTime(k, segments)}</Text>
-                </View>
-              );
-            })}
+          <View style={{ gap: 6 }}>
+            {SLOT_ORDER.map((k) => (
+              <Touchable
+                key={k}
+                accessibilityRole="button"
+                accessibilityLabel={`Show ${SLOT_LABEL[k]} rates`}
+                onPress={() => setSlot(k)}
+                style={[st.row, glassSurface('rgba(255, 255, 255, 0.55)', 12, 'rgba(31, 58, 112, 0.05)')]}>
+                <Sheen radius={12} strength={0.45} height="45%" />
+                <Bubble {...SLOT_LOOK[k]} />
+                <Text style={st.rowLabel}>{SLOT_LABEL[k]}</Text>
+                <Text style={st.rowTime}>{slotTime(k, segments)}</Text>
+                <Ionicons name="chevron-forward" size={16} color={NAVY} />
+              </Touchable>
+            ))}
           </View>
         </Section>
 
         {/* Time segments */}
         <Section
-          icon={<Ionicons name="settings-outline" size={20} color={C.primary} />}
+          icon={<Ionicons name="settings-outline" size={20} color="#7A3FD0" />}
+          tile={TILE.lilac}
           title="Time Segments"
           sub="Booking timings are built from these three segments. Tap one to change its hours.">
-          <View style={st.list}>
-            {segments.map((sg, i) => {
-              const m = SEGMENT_META[sg.key];
-              return (
-                <Touchable
-                  key={sg.key}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Edit ${sg.label}`}
-                  style={[st.row, i > 0 && st.rowRule]}
-                  onPress={() => {
-                    const a = to12(sg.start);
-                    const b = to12(sg.end);
-                    setStart(a.time);
-                    setStartAp(a.ap);
-                    setEnd(b.time);
-                    setEndAp(b.ap);
-                    setEditSeg(sg);
-                  }}>
-                  <Bubble icon={m.icon} fg={m.fg} bg={m.bg} />
-                  <Text style={st.rowLabel}>{sg.label}</Text>
-                  <Text style={st.segTime}>
-                    {fmtClock(sg.start)} – {fmtClock(sg.end)}
-                  </Text>
-                  <MaterialCommunityIcons name="square-edit-outline" size={20} color={C.primary} />
-                </Touchable>
-              );
-            })}
+          <View style={{ gap: 6 }}>
+            {segments.map((sg) => (
+              <Touchable
+                key={sg.key}
+                accessibilityRole="button"
+                accessibilityLabel={`Edit ${sg.label}`}
+                style={[st.row, glassSurface('rgba(255, 255, 255, 0.55)', 12, 'rgba(31, 58, 112, 0.05)')]}
+                onPress={() => {
+                  const a = to12(sg.start);
+                  const b = to12(sg.end);
+                  setStart(a.time);
+                  setStartAp(a.ap);
+                  setEnd(b.time);
+                  setEndAp(b.ap);
+                  setEditSeg(sg);
+                }}>
+                <Sheen radius={12} strength={0.45} height="45%" />
+                <Bubble {...SEGMENT_LOOK[sg.key]} />
+                <Text style={st.rowLabel}>{sg.label}</Text>
+                <Text style={st.segTime}>
+                  {sg.start} – {sg.end}
+                </Text>
+                <View style={[st.edit, glassSurface('rgba(255, 255, 255, 0.8)', 8, 'rgba(31, 58, 112, 0.08)')]}>
+                  <MaterialCommunityIcons name="pencil-outline" size={16} color={BLUE} />
+                </View>
+              </Touchable>
+            ))}
           </View>
         </Section>
 
         {/* Rates */}
         <Section
-          icon={<MaterialCommunityIcons name="currency-inr" size={21} color={C.primary} />}
+          icon={<MaterialCommunityIcons name="currency-inr" size={21} color="#1E8A80" />}
+          tile={TILE.mint}
           title={`Rates (${SLOT_LABEL[slot]})`}
           sub={`Rates based on date type for ${SLOT_LABEL[slot]} booking.`}>
-          <View style={st.tabs}>
+          <View style={[st.tabs, glassSurface('rgba(255, 255, 255, 0.5)', 16, 'rgba(31, 58, 112, 0.04)')]}>
             {SLOT_ORDER.map((k, i) => {
               const on = slot === k;
               const prevOn = i > 0 && slot === SLOT_ORDER[i - 1];
@@ -179,6 +224,8 @@ export default function PricingScreen() {
                     accessibilityRole="tab"
                     accessibilityState={{ selected: on }}
                     style={[st.tab, on && st.tabOn]}>
+                    {on ? <GradientFill from="#4F86E6" to="#1C48B0" radius={13} horizontal /> : null}
+                    {on ? <Sheen radius={13} strength={0.4} height="50%" /> : null}
                     <Text style={[st.tabText, on && st.tabTextOn]} numberOfLines={1}>
                       {k === 'early' ? 'Early' : SLOT_LABEL[k]}
                     </Text>
@@ -187,27 +234,29 @@ export default function PricingScreen() {
               );
             })}
           </View>
-          <View style={st.list}>
+          <View style={[st.rates, glassSurface('rgba(255, 255, 255, 0.55)', 12, 'rgba(31, 58, 112, 0.05)')]}>
+            <Sheen radius={12} strength={0.35} height="20%" />
             {CATEGORY_ORDER.map((cat, i) => (
               <Touchable
                 key={cat}
                 accessibilityRole="button"
                 accessibilityLabel={`Edit ${CATEGORY_LABEL[cat]} rate`}
-                style={[st.row, st.rateRow, i > 0 && st.rowRule]}
+                style={[st.rateRow, i > 0 && st.rowRule]}
                 onPress={() => {
                   setNonGst(String(rates[slot][cat].nonGst));
                   setGst(rates[slot][cat].gst ? String(rates[slot][cat].gst) : '');
                   setEditRate(cat);
                 }}>
-                <View style={[st.dot, { backgroundColor: CAT_DOT[cat] }]} />
+                <View style={[st.dot, { backgroundColor: CAT_DOT[cat], boxShadow: `0px 0px 5px ${CAT_DOT[cat]}66` }]} />
                 <Text style={st.rateLabel}>{CATEGORY_LABEL[cat]}</Text>
                 <Text style={st.rateAmt}>{inr(rateTotal(rates[slot][cat]))}</Text>
-                <Ionicons name="chevron-forward" size={17} color={C.text} />
+                <Ionicons name="chevron-forward" size={16} color={NAVY} />
               </Touchable>
             ))}
           </View>
         </Section>
       </ScrollView>
+      </ScrollFade>
 
       <BottomSheet
         visible={!!editSeg}
@@ -299,22 +348,47 @@ export default function PricingScreen() {
   );
 }
 
-/** White section card: blush icon circle, serif burgundy title with a gold rule, caption, then content. */
-function Section({ icon, title, sub, children }: { icon: ReactNode; title: string; sub: string; children: ReactNode }) {
+/** Frosted section card: pastel icon tile, navy serif title with a blue rule, caption, then content. */
+function Section({
+  icon,
+  tile,
+  title,
+  sub,
+  children,
+}: {
+  icon: ReactNode;
+  tile: readonly [string, string];
+  title: string;
+  sub: string;
+  children: ReactNode;
+}) {
   return (
-    <View style={st.card}>
+    <View style={[st.card, glassSurface('rgba(244, 248, 255, 0.5)', 18)]}>
+      <Sheen radius={18} strength={0.45} height="25%" />
       <View style={st.head}>
-        <View style={st.headIcon}>{icon}</View>
+        <GlossTile from={tile[0]} to={tile[1]} radius={10} style={st.headIcon}>
+          {icon}
+        </GlossTile>
         <View style={{ flex: 1 }}>
           <View style={st.titleRow}>
             <Text style={st.title}>{title}</Text>
-            <GoldRule maxWidth={90} />
+            <TitleRule />
           </View>
           <Text style={st.sub}>{sub}</Text>
         </View>
       </View>
       {children}
     </View>
+  );
+}
+
+/** Blue hairline after a section title, ending in a small open diamond. */
+function TitleRule() {
+  return (
+    <Svg width={60} height={8} viewBox="0 0 60 8" pointerEvents="none">
+      <Path d="M0 4H52" stroke={BLUE} strokeWidth={1} strokeOpacity={0.85} />
+      <Path d="M55.5 1L58.5 4L55.5 7L52.5 4Z" stroke={BLUE} strokeWidth={1} fill="#FFFFFF" />
+    </Svg>
   );
 }
 
@@ -366,11 +440,16 @@ function AmountCard({
   );
 }
 
-function Bubble({ icon, fg, bg }: { icon: keyof typeof MaterialCommunityIcons.glyphMap; fg: string; bg: string }) {
+/** Glossy pastel circle holding a line-art sky icon. */
+function Bubble({ icon, fg, tile }: Look) {
   return (
-    <View style={[st.bubble, { backgroundColor: bg }]}>
-      <MaterialCommunityIcons name={icon} size={19} color={fg} />
-    </View>
+    <GlossTile from={tile[0]} to={tile[1]} radius={16} style={st.bubble}>
+      {icon === 'moon-outline' ? (
+        <Ionicons name="moon-outline" size={18} color={fg} />
+      ) : (
+        <MaterialCommunityIcons name={icon} size={19} color={fg} />
+      )}
+    </GlossTile>
   );
 }
 
@@ -407,47 +486,41 @@ const st = StyleSheet.create({
   meridiemItem: { flex: 1, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   meridiemOn: { backgroundColor: C.primary },
   meridiemText: { fontFamily: F.medium, fontSize: 14, color: C.text },
-  screen: { flex: 1, backgroundColor: C.bg },
-  body: { padding: 14, gap: 12, paddingBottom: 32 },
+  screen: { flex: 1, backgroundColor: '#E6EEF9' },
+  body: { paddingHorizontal: 18, paddingTop: 16, gap: 12 },
 
-  card: { backgroundColor: C.surface, borderRadius: radius.md, padding: 12, gap: 12, ...elevation },
-  head: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  headIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: C.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
+  card: { padding: 11, paddingTop: 13, gap: 11 },
+  head: { flexDirection: 'row', alignItems: 'flex-start', gap: 11, paddingHorizontal: 2 },
+  headIcon: { width: 38, height: 38 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  title: { fontFamily: F.pageSerifBold, fontSize: 19, lineHeight: 24, letterSpacing: -0.2, color: INK },
+  sub: { fontFamily: F.regular, fontSize: 12, lineHeight: 16, color: MUTED, marginTop: 1 },
+
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 48, paddingLeft: 6, paddingRight: 10 },
+  rowRule: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(31, 58, 112, 0.14)' },
+  bubble: { width: 36, height: 36 },
+  rowLabel: { flex: 1, fontFamily: F.semibold, fontSize: 14, color: INK },
+  rowTime: { fontFamily: F.regular, fontSize: 12.5, color: MUTED },
+  segTime: { fontFamily: F.medium, fontSize: 13.5, color: INK, fontVariant: ['tabular-nums'] },
+  edit: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', marginRight: -4 },
+
+  tabs: { flexDirection: 'row', padding: 2, height: 38 },
+  tab: { flex: 1, borderRadius: 13, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  tabOn: {
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.95)',
+    boxShadow:
+      'inset 0px 1px 0px rgba(255, 255, 255, 0.5), 0px 0px 0px 1px rgba(95, 140, 220, 0.35), 0px 0px 10px rgba(70, 125, 230, 0.5), 0px 4px 10px rgba(28, 72, 176, 0.25)',
   },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  title: { fontFamily: F.serifBold, fontSize: 21, lineHeight: 26, color: C.primary },
-  sub: { ...T.caption, marginTop: 1 },
+  tabSep: { width: StyleSheet.hairlineWidth, marginVertical: 8, backgroundColor: 'rgba(31, 58, 112, 0.25)' },
+  tabText: { fontFamily: F.regular, fontSize: 13, color: INK },
+  tabTextOn: { fontFamily: F.semibold, color: '#FFFFFF' },
 
-  list: { borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface, paddingHorizontal: 12 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 50, paddingVertical: 6 },
-  rowRule: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border },
-  bubble: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  rowLabel: { flex: 1, fontFamily: F.semibold, fontSize: 14, color: C.text },
-  rowTime: { fontFamily: F.regular, fontSize: 12.5, color: C.textSecondary },
-  segTime: { fontFamily: F.medium, fontSize: 12.5, color: C.text, fontVariant: ['tabular-nums'] },
-
-  tabs: {
-    flexDirection: 'row',
-    padding: 3,
-    borderRadius: radius.pill,
-    backgroundColor: C.surfaceAlt,
-  },
-  tab: { flex: 1, minHeight: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  tabOn: { backgroundColor: C.primary, borderWidth: 1.2, borderColor: GOLD },
-  tabSep: { width: 1, marginVertical: 9, backgroundColor: C.borderStrong },
-  tabText: { fontFamily: F.medium, fontSize: 12.5, color: C.text },
-  tabTextOn: { fontFamily: F.semibold, color: C.onPrimary },
-
-  rateRow: { minHeight: 46 },
+  rates: { paddingHorizontal: 12 },
+  rateRow: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 42 },
   dot: { width: 10, height: 10, borderRadius: 5 },
-  rateLabel: { flex: 1, fontFamily: F.regular, fontSize: 14, color: C.text },
-  rateAmt: { fontFamily: F.bold, fontSize: 14.5, color: C.text, fontVariant: ['tabular-nums'] },
+  rateLabel: { flex: 1, fontFamily: F.regular, fontSize: 13.5, color: INK },
+  rateAmt: { fontFamily: F.bold, fontSize: 14, color: INK, fontVariant: ['tabular-nums'] },
 
   sheetFloral: { position: 'absolute', top: -12, right: -20, width: 130, height: 100, opacity: 0.35 },
   sheetHead: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 2 },

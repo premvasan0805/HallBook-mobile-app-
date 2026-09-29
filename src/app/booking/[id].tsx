@@ -1,43 +1,53 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import type { ComponentProps, ReactNode } from 'react';
 import { useState } from 'react';
-import { Linking, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Linking, ScrollView, StyleSheet, Text, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 
-import { BrandPageHeader } from '@/components/brand-page';
 import { openCustomer } from '@/components/cards';
+import { GlossTile, glassSurface, GradientFill, Sheen } from '@/components/glass';
+import { GlassActionButton } from '@/components/glass-action';
+import { GlassBackdrop } from '@/components/glass-header';
 import { ConfirmDialog, useToast } from '@/components/overlays';
-import { ErrorState, Screen, Touchable } from '@/components/primitives';
+import { ErrorState, goBack, Screen, Touchable } from '@/components/primitives';
 import { RecordPaymentSheet } from '@/components/sheets';
 import { fmtDate, fmtFull, fmtLong, inr, MONTHS, parseISO } from '@/lib/format';
 import { balanceOf, GST_RATE, paidOf, payState, SLOT_LABEL, useStore, type BookingStatus } from '@/lib/store';
-import { appWidth, C, F } from '@/lib/theme';
+import { appWidth, F } from '@/lib/theme';
 
 type Ion = ComponentProps<typeof Ionicons>['name'];
 type Mci = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
-const BUTTON_MANDALA = require('../../../assets/images/booking/button-mandala.png');
-
 /** This screen is laid out on an 853px-wide design reference; `u(px)` converts a reference pixel to dp. */
 const REF_WIDTH = 853;
 
-const BURGUNDY = '#7B1030';
-const INK = '#1C1B22';
-const GREY = '#6E6D72';
-const RULE = '#ECDBCE';
-const PINK = '#F9E8EA';
-const PANEL = '#FAF5F0';
-const RED = '#C8102E';
+/** Blue glass palette, shared with Home and the Customers screens. */
+const INK = '#131D38';
+const NAVY = '#1F3A70';
+const BLUE = '#2F63C0';
+const GREY = '#5B6275';
+const RULE = 'rgba(31, 58, 112, 0.14)';
+const RED = '#B8102C';
 
+/** Glossy pill tones: gradient body, strong foreground. */
 const TONES = {
-  warning: { bg: '#FEEBD3', fg: '#A9600E' },
-  success: { bg: '#E3F2E6', fg: '#2E7D4F' },
-  info: { bg: '#E6EEF7', fg: '#3B5F8A' },
-  danger: { bg: '#FBE3E5', fg: RED },
+  warning: { from: '#FFF7E6', to: '#FBE3B4', fg: '#B0680A' },
+  success: { from: '#EFFAF4', to: '#CDEBDA', fg: '#1F7A4A' },
+  info: { from: '#F2F7FF', to: '#D8E6FA', fg: '#2F5FA8' },
+  danger: { from: '#FFF1F4', to: '#FBD9E0', fg: '#D42A45' },
 };
+
+/** Tinted glossy discs and tiles. */
+const TINT = {
+  blue: { from: '#F4F8FF', to: '#D9E6FA', fg: BLUE },
+  lilac: { from: '#F8F5FF', to: '#E2D9F8', fg: '#5B3FC4' },
+  mint: { from: '#F1FBF6', to: '#CDEFDD', fg: '#13824F' },
+  peach: { from: '#FFF6EE', to: '#F8DEC8', fg: '#B0612A' },
+  glass: { from: '#FFFFFF', to: '#E9F0FB', fg: NAVY },
+};
+type Tint = (typeof TINT)[keyof typeof TINT];
 
 const STATUS_PILL: Record<BookingStatus, { tone: keyof typeof TONES; icon: Ion }> = {
   confirmed: { tone: 'success', icon: 'checkmark-circle-outline' },
@@ -109,23 +119,29 @@ export default function BookingDetailsScreen() {
     lineHeight: u(line),
     color,
   });
-  const card = {
-    marginHorizontal: u(25),
-    borderRadius: u(26),
-    backgroundColor: '#FFFCFA',
+  const card: ViewStyle = { marginHorizontal: u(27), ...glassSurface('rgba(255, 255, 255, 0.5)', u(30)) };
+  /** Frosted inset panel inside a card. */
+  const panel: ViewStyle = {
+    marginHorizontal: u(19),
+    borderRadius: u(24),
+    backgroundColor: 'rgba(255, 255, 255, 0.45)',
     borderWidth: 1,
-    borderColor: '#F2E7DF',
-    boxShadow: `0px ${u(5)}px ${u(16)}px rgba(120, 70, 40, 0.07)`,
-  } as const;
-  const circle = (size: number, bg = PINK) =>
-    ({ width: u(size), height: u(size), borderRadius: u(size / 2), backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }) as const;
-  const divider = { height: 1.2, backgroundColor: RULE, marginHorizontal: u(25) } as const;
+    borderColor: 'rgba(255, 255, 255, 0.95)',
+    boxShadow: 'inset 0px 1.5px 0px rgba(255, 255, 255, 1), inset 0px 0px 14px rgba(255, 255, 255, 0.6), 0px 4px 12px rgba(31, 58, 112, 0.06)',
+  };
+  const divider = { height: 1, backgroundColor: RULE, marginHorizontal: u(25) } as const;
 
-  /** Card heading: 54px icon slot (optionally on a pink disc) and a burgundy serif title. */
-  const heading = (icon: ReactNode, title: string, onDisc: boolean, right?: ReactNode) => (
-    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: u(16), marginLeft: u(26), height: u(54) }}>
-      <View style={onDisc ? circle(54) : { width: u(54), height: u(54), alignItems: 'center', justifyContent: 'center' }}>{icon}</View>
-      <Text style={[text(F.pageSerifBold, 27.5, 34, BURGUNDY), { marginLeft: u(26), flex: 1 }]} numberOfLines={1}>
+  const orb = (size: number, tint: Tint, children: ReactNode, square?: boolean) => (
+    <GlossTile from={tint.from} to={tint.to} radius={u(square ? size * 0.3 : size / 2)} style={{ width: u(size), height: u(size) }}>
+      {children}
+    </GlossTile>
+  );
+
+  /** Card heading: 56px glossy disc with a blue glyph, then an ink serif title. */
+  const heading = (icon: ReactNode, title: string, right?: ReactNode, square?: boolean) => (
+    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: u(16), marginLeft: u(24), height: u(56) }}>
+      {orb(56, TINT.blue, icon, square)}
+      <Text style={[text(F.pageSerifBold, 29, 36, INK), { marginLeft: u(26), flex: 1, letterSpacing: -u(0.4) }]} numberOfLines={1}>
         {title}
       </Text>
       {right}
@@ -133,257 +149,264 @@ export default function BookingDetailsScreen() {
   );
 
   const pill = (label: string, icon: Ion, tone: keyof typeof TONES) => (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: u(12),
-        height: u(48),
-        paddingHorizontal: u(19),
-        borderRadius: u(24),
-        backgroundColor: TONES[tone].bg,
-      }}>
+    <GlossTile
+      from={TONES[tone].from}
+      to={TONES[tone].to}
+      radius={u(25)}
+      style={{ flexDirection: 'row', gap: u(12), height: u(50), paddingHorizontal: u(20) }}>
       <Ionicons name={icon} size={u(30)} color={TONES[tone].fg} />
-      <Text style={[text(F.semibold, 19.4, 24, TONES[tone].fg), { letterSpacing: u(0.8) }]}>{label}</Text>
-    </View>
+      <Text style={[text(F.semibold, 20, 26, TONES[tone].fg), { letterSpacing: u(0.8) }]}>{label}</Text>
+    </GlossTile>
   );
 
-  const metaSep = <View style={{ width: 1.2, height: u(28), backgroundColor: RULE, marginHorizontal: u(19) }} />;
+  const metaSep = <View style={{ width: 1, height: u(28), backgroundColor: RULE, marginHorizontal: u(19) }} />;
   const meta = (icon: ReactNode, label: string, shrink?: boolean) => (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: u(12), flexShrink: shrink ? 1 : 0 }}>
       {icon}
-      <Text style={text(F.regular, 19.5, 24, INK)} numberOfLines={1}>
+      <Text style={text(F.regular, 20, 26, INK)} numberOfLines={1}>
         {label}
       </Text>
     </View>
   );
 
+  const headerOrb = (icon: ReactNode, label: string, onPress: () => void) => (
+    <Touchable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      hitSlop={8}
+      style={[{ width: u(78), height: u(78), alignItems: 'center', justifyContent: 'center' }, glassSurface('rgba(255, 255, 255, 0.62)', u(39))]}>
+      <Sheen radius={u(39)} strength={0.6} />
+      {icon}
+    </Touchable>
+  );
+
   return (
-    <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <BrandPageHeader title="Booking" accent="Details" />
+    <View style={{ flex: 1 }}>
+      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        <GlassBackdrop />
+      </View>
+
+      {/* ---------- Header ---------- */}
+      <View style={{ paddingTop: insets.top + u(70), paddingHorizontal: u(32), flexDirection: 'row', alignItems: 'center' }}>
+        {headerOrb(<Ionicons name="arrow-back" size={u(38)} color={INK} />, 'Back', goBack)}
+        <View style={{ flex: 1, marginLeft: u(27) }}>
+          <Text style={[text(F.pageSerifBold, 46, 58, INK), { letterSpacing: -u(1.2) }]} numberOfLines={1}>
+            Booking <Text style={{ color: BLUE }}>Details</Text>
+          </Text>
+          <View style={{ position: 'absolute', left: 0, top: u(66) }}>
+            <TitleRule u={u} />
+          </View>
+        </View>
+        {!cancelled ? headerOrb(<Ionicons name="ellipsis-vertical" size={u(34)} color={INK} />, 'Edit booking', edit) : null}
+      </View>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: u(26), paddingBottom: insets.bottom, gap: u(26) }}>
-      {/* ---------- Summary ---------- */}
-      <View style={[card, { borderColor: '#E8D2BD', borderWidth: 1.5, flexDirection: 'row', padding: u(27), paddingTop: u(37), paddingRight: u(25), paddingBottom: u(25) }]}>
-        <View style={{ width: u(153), height: u(205), borderRadius: u(22), backgroundColor: '#FAE6E8', alignItems: 'center', marginRight: u(30) }}>
-          <Text style={[text(F.pageSerifBold, 60, 66, BURGUNDY), { marginTop: u(27) }]}>{String(d.getDate()).padStart(2, '0')}</Text>
-          <Text style={[text(F.medium, 22.6, 28, '#5E0E22'), { marginTop: u(9), letterSpacing: u(0.6) }]}>
-            {MONTHS[d.getMonth()].slice(0, 3).toUpperCase()} {d.getFullYear()}
-          </Text>
-          <View style={{ marginTop: u(15), width: u(87), height: u(38), borderRadius: u(19), backgroundColor: '#F8D6DB', alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={text(F.medium, 21.2, 26, BURGUNDY)}>{weekday}</Text>
-          </View>
-        </View>
-
-        <View style={{ flex: 1, marginTop: -u(5) }}>
-          <Text style={[text(F.regular, 24.2, 30, GREY), { letterSpacing: u(0.4) }]}>{booking.number}</Text>
-          <View style={{ position: 'absolute', right: -u(3), top: -u(7) }}>{pill(booking.status.toUpperCase(), status.icon, status.tone)}</View>
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: u(16), marginLeft: -u(2), height: u(60) }}>
-            <View style={circle(60)}>
-              <MaterialCommunityIcons name={glyph.badge} size={u(34)} color={BURGUNDY} />
+        contentContainerStyle={{ paddingTop: u(44), paddingBottom: insets.bottom, gap: u(24) }}>
+        {/* ---------- Summary ---------- */}
+        <View style={[card, { flexDirection: 'row', padding: u(22), paddingTop: u(34), paddingRight: u(20), paddingBottom: u(26) }]}>
+          <Sheen radius={u(30)} strength={0.55} />
+          <GlossTile from="#F3F8FF" to="#D6E4FA" radius={u(26)} style={{ width: u(155), height: u(205), justifyContent: 'flex-start', marginRight: u(32) }}>
+            <Text style={[text(F.pageSerifBold, 62, 68, '#1A2C7A'), { marginTop: u(25) }]}>{String(d.getDate()).padStart(2, '0')}</Text>
+            <Text style={[text(F.medium, 23, 28, INK), { marginTop: u(8), letterSpacing: u(0.6) }]}>
+              {MONTHS[d.getMonth()].slice(0, 3).toUpperCase()} {d.getFullYear()}
+            </Text>
+            <View style={{ marginTop: u(14), width: u(88), height: u(38), borderRadius: u(19), backgroundColor: 'rgba(186, 208, 244, 0.7)', alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={text(F.semibold, 21, 26, '#1F4FA8')}>{weekday}</Text>
             </View>
-            <Text
-              style={[text(F.pageSerifBold, 37, 44, cancelled ? '#9A9A9F' : INK), { marginLeft: u(24), flex: 1 }, cancelled && { textDecorationLine: 'line-through' }]}
-              numberOfLines={1}>
-              {booking.eventType}
-            </Text>
-          </View>
+          </GlossTile>
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: u(24) }}>
-            {meta(<Ionicons name="time-outline" size={u(28)} color={BURGUNDY} />, SLOT_LABEL[booking.slot])}
-            {metaSep}
-            {meta(<MaterialCommunityIcons name={glyph.meta} size={u(28)} color={BURGUNDY} />, booking.eventType)}
-            {metaSep}
-            {meta(<MaterialCommunityIcons name="office-building-outline" size={u(28)} color={BURGUNDY} />, hall.name, true)}
-          </View>
+          <View style={{ flex: 1, marginTop: -u(8) }}>
+            <Text style={[text(F.regular, 24, 30, GREY), { letterSpacing: u(0.6) }]}>{booking.number}</Text>
+            <View style={{ position: 'absolute', right: 0, top: -u(14) }}>{pill(booking.status.toUpperCase(), status.icon, status.tone)}</View>
 
-          <View style={{ height: 1.2, backgroundColor: RULE, marginTop: u(20) }} />
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: u(17), marginTop: u(17) }}>
-            <MaterialCommunityIcons name="calendar-month-outline" size={u(32)} color={BURGUNDY} />
-            <Text style={text(F.regular, 21.9, 28, '#505055')} numberOfLines={1}>
-              Booked on {fmtLong(booking.bookedOn)}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* ---------- Customer ---------- */}
-      <Touchable onPress={cust ? () => openCustomer(cust.id) : undefined} disabled={!cust} style={[card, { paddingBottom: u(22) }]}>
-        {heading(<Ionicons name="person-outline" size={u(30)} color={BURGUNDY} />, 'Customer', true)}
-        <View style={[divider, { marginTop: u(9) }]} />
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: u(14), marginLeft: u(38), marginRight: u(24) }}>
-          <View style={circle(100, '#F8E4E6')}>
-            <Text style={text(F.pageSerifBold, 33, 40, BURGUNDY)}>{initialsOf(cust?.name ?? '?')}</Text>
-          </View>
-          <View style={{ flex: 1, marginLeft: u(29) }}>
-            <Text style={text(F.pageSerifBold, 26.7, 34, INK)} numberOfLines={1}>
-              {cust?.name ?? 'Unknown customer'}
-            </Text>
-            <Text style={[text(F.regular, 23.6, 30, GREY), { marginTop: u(7), letterSpacing: u(0.5) }]}>{cust?.phone || 'No phone'}</Text>
-          </View>
-          {phone ? (
-            <>
-              <Touchable onPress={call} accessibilityLabel="Call" hitSlop={4} style={circle(64, '#F8DFE3')}>
-                <Ionicons name="call" size={u(30)} color={BURGUNDY} />
-              </Touchable>
-              <Touchable onPress={whatsapp} accessibilityLabel="WhatsApp" hitSlop={4} style={[circle(64, '#F8DFE3'), { marginLeft: u(24) }]}>
-                <Ionicons name="logo-whatsapp" size={u(34)} color={BURGUNDY} />
-              </Touchable>
-            </>
-          ) : null}
-          {cust ? (
-            <View style={[circle(60, '#F8EEF0'), { marginLeft: u(24) }]}>
-              <Ionicons name="chevron-forward" size={u(30)} color="#A58A90" />
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: u(14), height: u(62) }}>
+              {orb(60, TINT.lilac, <MaterialCommunityIcons name={glyph.badge} size={u(34)} color="#3B3FB8" />)}
+              <Text
+                style={[text(F.pageSerifBold, 40, 48, cancelled ? '#9AA0B0' : INK), { marginLeft: u(22), flex: 1 }, cancelled && { textDecorationLine: 'line-through' }]}
+                numberOfLines={1}>
+                {booking.eventType}
+              </Text>
             </View>
-          ) : null}
-        </View>
-      </Touchable>
 
-      {/* ---------- Event ---------- */}
-      <View style={[card, { paddingBottom: u(18) }]}>
-        {heading(<MaterialCommunityIcons name="calendar-blank-outline" size={u(44)} color={BURGUNDY} />, 'Event Details', false)}
-        <View style={{ flexDirection: 'row', marginTop: u(11), marginHorizontal: u(25), borderRadius: u(18), backgroundColor: PANEL, paddingTop: u(25), paddingBottom: u(16) }}>
-          <EventCell u={u} flex={264} icon={<MaterialCommunityIcons name="calendar-month-outline" size={u(38)} color={BURGUNDY} />} label="Date" value={fmtLong(booking.date)} />
-          <PanelSep u={u} />
-          <EventCell u={u} flex={240} icon={<Ionicons name="time-outline" size={u(38)} color={BURGUNDY} />} label="Timing" value={SLOT_LABEL[booking.slot]} />
-          <PanelSep u={u} />
-          <EventCell u={u} flex={251} icon={<MaterialCommunityIcons name="office-building-outline" size={u(38)} color={BURGUNDY} />} label="Hall" value={hall.name} />
-        </View>
-      </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: u(22) }}>
+              {meta(<Ionicons name="time-outline" size={u(28)} color={BLUE} />, SLOT_LABEL[booking.slot])}
+              {metaSep}
+              {meta(<MaterialCommunityIcons name={glyph.meta} size={u(28)} color={BLUE} />, booking.eventType)}
+              {metaSep}
+              {meta(<MaterialCommunityIcons name="office-building-outline" size={u(30)} color={BLUE} />, hall.name, true)}
+            </View>
 
-      {/* ---------- Payments ---------- */}
-      <View style={[card, { paddingBottom: u(22) }]}>
-        {heading(
-          <MaterialCommunityIcons name="wallet-outline" size={u(32)} color={BURGUNDY} />,
-          'Payments',
-          true,
-          <View style={{ marginRight: u(22) }}>{pill(payPill.label, payPill.icon, payPill.tone)}</View>,
-        )}
-        <View style={{ flexDirection: 'row', marginTop: u(12), marginHorizontal: u(25), borderRadius: u(18), backgroundColor: '#FBF7F4', paddingTop: u(23), paddingBottom: u(19) }}>
-          <AmountCell u={u} flex={252} padLeft={29} label="Total Amount" value={booking.total} color={INK} />
-          <PanelSep u={u} />
-          <AmountCell u={u} flex={259} padLeft={39} label="Paid Amount" value={paid} color={paid > 0 ? '#2E7D4F' : '#77777C'} />
-          <PanelSep u={u} />
-          <AmountCell u={u} flex={244} padLeft={37} label="Balance Amount" value={due} color={due > 0 && !cancelled ? '#A8650F' : '#77777C'} />
-        </View>
+            <View style={{ height: 1, backgroundColor: RULE, marginTop: u(18) }} />
 
-        {booking.gstAmount ? (
-          <View style={{ gap: u(10), marginTop: u(18), marginHorizontal: u(29) }}>
-            <InfoRow u={u} label="Non-GST amount" value={inr(booking.nonGstAmount ?? 0)} />
-            <InfoRow u={u} label="GST amount" value={inr(booking.gstAmount)} />
-            <InfoRow u={u} label={`GST ${GST_RATE * 100}%`} value={inr(Math.round(booking.gstAmount * GST_RATE))} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: u(18), marginTop: u(16) }}>
+              <MaterialCommunityIcons name="calendar-month-outline" size={u(32)} color={BLUE} />
+              <Text style={text(F.regular, 22, 28, GREY)} numberOfLines={1}>
+                Booked on {fmtLong(booking.bookedOn)}
+              </Text>
+            </View>
           </View>
-        ) : null}
+        </View>
 
-        {booking.payments.length > 0 ? (
-          <View style={{ marginTop: u(18), marginHorizontal: u(29), gap: u(16) }}>
-            <Text style={[text(F.semibold, 18, 24, GREY), { letterSpacing: u(1) }]}>HISTORY</Text>
-            {booking.payments.map((p) => (
-              <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: u(20) }}>
-                <View style={circle(56, TONES.success.bg)}>
-                  <Ionicons name="checkmark" size={u(30)} color={TONES.success.fg} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={text(F.pageSerifBold, 26, 32, INK)}>
-                    <Money value={p.amount} u={u} size={26} />
-                  </Text>
-                  <Text style={text(F.regular, 20, 26, GREY)}>
-                    {p.mode} · {fmtDate(p.date)}
-                    {p.reference ? ` · Ref ${p.reference}` : ''}
-                  </Text>
-                  {p.notes ? <Text style={text(F.regular, 20, 26, GREY)}>{p.notes}</Text> : null}
-                </View>
+        {/* ---------- Customer ---------- */}
+        <Touchable onPress={cust ? () => openCustomer(cust.id) : undefined} disabled={!cust} style={[card, { paddingBottom: u(22) }]}>
+          <Sheen radius={u(30)} strength={0.55} />
+          {heading(<Ionicons name="person-outline" size={u(30)} color={BLUE} />, 'Customer')}
+          <View style={[divider, { marginTop: u(12) }]} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: u(14), marginLeft: u(34), marginRight: u(24) }}>
+            {orb(102, TINT.lilac, <Text style={text(F.pageSerifBold, 34, 42, '#2B2F7A')}>{initialsOf(cust?.name ?? '?')}</Text>)}
+            <View style={{ flex: 1, marginLeft: u(28) }}>
+              <Text style={text(F.pageSerifBold, 30, 38, INK)} numberOfLines={1}>
+                {cust?.name ?? 'Unknown customer'}
+              </Text>
+              <Text style={[text(F.regular, 25, 32, GREY), { marginTop: u(4), letterSpacing: u(0.6) }]}>{cust?.phone || 'No phone'}</Text>
+            </View>
+            {phone ? (
+              <>
+                <Touchable onPress={call} accessibilityLabel="Call" hitSlop={4}>
+                  <ActionOrb u={u} tint={TINT.mint} glow="rgba(60, 190, 120, 0.4)">
+                    <Ionicons name="call" size={u(32)} color={TINT.mint.fg} />
+                  </ActionOrb>
+                </Touchable>
+                <Touchable onPress={whatsapp} accessibilityLabel="WhatsApp" hitSlop={4} style={{ marginLeft: u(25) }}>
+                  <ActionOrb u={u} tint={TINT.lilac} glow="rgba(140, 100, 240, 0.4)">
+                    <Ionicons name="logo-whatsapp" size={u(34)} color={TINT.lilac.fg} />
+                  </ActionOrb>
+                </Touchable>
+              </>
+            ) : null}
+            {cust ? (
+              <View style={{ marginLeft: u(25) }}>
+                <ActionOrb u={u} tint={TINT.glass} glow="rgba(255, 255, 255, 0.9)">
+                  <Ionicons name="chevron-forward" size={u(30)} color={NAVY} />
+                </ActionOrb>
               </View>
-            ))}
+            ) : null}
           </View>
-        ) : null}
+        </Touchable>
 
-        {!cancelled && due > 0 ? (
+        {/* ---------- Event ---------- */}
+        <View style={[card, { paddingBottom: u(16) }]}>
+          <Sheen radius={u(30)} strength={0.55} />
+          {heading(<MaterialCommunityIcons name="calendar-blank-outline" size={u(34)} color={BLUE} />, 'Event Details', undefined, true)}
+          <View style={[panel, { flexDirection: 'row', marginTop: u(20), paddingTop: u(24), paddingBottom: u(22) }]}>
+            <EventCell u={u} flex={268} tint={TINT.blue} icon="calendar-month-outline" label="Date" value={fmtLong(booking.date)} />
+            <PanelSep u={u} />
+            <EventCell u={u} flex={238} tint={TINT.lilac} icon="clock-outline" label="Timing" value={SLOT_LABEL[booking.slot]} />
+            <PanelSep u={u} />
+            <EventCell u={u} flex={256} tint={TINT.peach} icon="office-building-outline" label="Hall" value={hall.name} />
+          </View>
+        </View>
+
+        {/* ---------- Payments ---------- */}
+        <View style={[card, { paddingBottom: u(18) }]}>
+          <Sheen radius={u(30)} strength={0.55} />
+          {heading(
+            <MaterialCommunityIcons name="wallet-outline" size={u(32)} color={BLUE} />,
+            'Payments',
+            <View style={{ marginRight: u(22) }}>{pill(payPill.label, payPill.icon, payPill.tone)}</View>,
+          )}
+          <View style={[panel, { flexDirection: 'row', marginTop: u(18), paddingTop: u(22), paddingBottom: u(20) }]}>
+            <AmountCell u={u} flex={258} padLeft={32} label="Total Amount" value={booking.total} color={INK} />
+            <PanelSep u={u} />
+            <AmountCell u={u} flex={256} padLeft={38} label="Paid Amount" value={paid} color={paid > 0 ? '#1F7A4A' : '#8A90A2'} />
+            <PanelSep u={u} />
+            <AmountCell u={u} flex={248} padLeft={37} label="Balance Amount" value={due} color={due > 0 && !cancelled ? '#B8790F' : '#8A90A2'} />
+          </View>
+
+          {booking.gstAmount ? (
+            <View style={{ gap: u(10), marginTop: u(18), marginHorizontal: u(32) }}>
+              <InfoRow u={u} label="Non-GST amount" value={inr(booking.nonGstAmount ?? 0)} />
+              <InfoRow u={u} label="GST amount" value={inr(booking.gstAmount)} />
+              <InfoRow u={u} label={`GST ${GST_RATE * 100}%`} value={inr(Math.round(booking.gstAmount * GST_RATE))} />
+            </View>
+          ) : null}
+
+          {booking.payments.length > 0 ? (
+            <View style={{ marginTop: u(18), marginHorizontal: u(32), gap: u(16) }}>
+              <Text style={[text(F.semibold, 18, 24, GREY), { letterSpacing: u(1) }]}>HISTORY</Text>
+              {booking.payments.map((p) => (
+                <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: u(20) }}>
+                  {orb(56, TINT.mint, <Ionicons name="checkmark" size={u(30)} color={TINT.mint.fg} />)}
+                  <View style={{ flex: 1 }}>
+                    <Text style={text(F.pageSerifBold, 26, 32, INK)}>
+                      <Money value={p.amount} u={u} size={26} />
+                    </Text>
+                    <Text style={text(F.regular, 20, 26, GREY)}>
+                      {p.mode} · {fmtDate(p.date)}
+                      {p.reference ? ` · Ref ${p.reference}` : ''}
+                    </Text>
+                    {p.notes ? <Text style={text(F.regular, 20, 26, GREY)}>{p.notes}</Text> : null}
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {!cancelled && due > 0 ? (
+            <GlassActionButton
+              title="Add Payment"
+              onPress={() => setPay(true)}
+              lotus
+              height={u(100)}
+              style={{ marginTop: u(8), marginHorizontal: u(19) }}
+            />
+          ) : null}
+        </View>
+
+        {/* ---------- Additional information ---------- */}
+        <View style={[card, { paddingBottom: u(18) }]}>
+          <Sheen radius={u(30)} strength={0.55} />
+          {heading(<Ionicons name="document-text-outline" size={u(32)} color={BLUE} />, 'Additional Information')}
+          {extras.length > 0 ? (
+            <View style={{ gap: u(10), marginTop: u(18), marginHorizontal: u(38) }}>
+              {extras.map(([k, v]) => (
+                <InfoRow key={k} u={u} label={k} value={v} />
+              ))}
+            </View>
+          ) : null}
           <Touchable
-            onPress={() => setPay(true)}
+            onPress={cancelled ? undefined : edit}
+            disabled={cancelled}
+            accessibilityLabel="Edit notes"
+            style={[panel, { flexDirection: 'row', alignItems: 'center', marginTop: u(20), paddingVertical: u(18), paddingLeft: u(26), paddingRight: u(22) }]}>
+            {orb(74, TINT.blue, <Ionicons name="document-text-outline" size={u(36)} color={BLUE} />)}
+            <View style={{ flex: 1, marginLeft: u(28) }}>
+              <Text style={text(F.regular, 20, 26, GREY)}>Notes</Text>
+              <Text style={[text(F.medium, 22, 30, INK), { marginTop: u(4) }]}>{booking.notes || '-'}</Text>
+            </View>
+            {!cancelled ? <Ionicons name="chevron-forward" size={u(34)} color={NAVY} /> : null}
+          </Touchable>
+        </View>
+
+        {/* ---------- Cancel ---------- */}
+        {!cancelled ? (
+          <Touchable
+            onPress={() => setConfirmCancel(true)}
             accessibilityRole="button"
-            accessibilityLabel="Add Payment"
+            accessibilityLabel="Cancel Booking"
             style={{
-              marginTop: u(7),
-              marginHorizontal: u(25),
-              height: u(82),
-              borderRadius: u(16),
-              overflow: 'hidden',
+              marginHorizontal: u(30),
+              height: u(94),
+              borderRadius: u(24),
+              borderWidth: 1.5,
+              borderColor: 'rgba(255, 255, 255, 0.95)',
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: u(25),
+              gap: u(24),
+              boxShadow:
+                'inset 0px 2px 0px rgba(255, 255, 255, 1), inset 0px 0px 18px rgba(255, 255, 255, 0.7), 0px 0px 8px rgba(255, 255, 255, 0.9), 0px 0px 22px rgba(240, 150, 175, 0.45), 0px 10px 22px rgba(180, 40, 80, 0.12)',
             }}>
-            <Svg style={StyleSheet.absoluteFill} viewBox="0 0 100 100" preserveAspectRatio="none">
-              <Defs>
-                <LinearGradient id="addPayFill" x1="0" y1="0" x2="1" y2="1">
-                  <Stop offset="0" stopColor="#7A0C2A" />
-                  <Stop offset="1" stopColor="#881537" />
-                </LinearGradient>
-              </Defs>
-              <Rect width={100} height={100} fill="url(#addPayFill)" />
-            </Svg>
-            <Image source={BUTTON_MANDALA} style={{ position: 'absolute', left: u(540), top: u(3), width: u(214), height: u(77) }} />
-            <Ionicons name="add" size={u(42)} color="#FFFFFF" />
-            <Text style={text(F.pageSerifBold, 28.8, 36, '#FFFFFF')}>Add Payment</Text>
+            <GradientFill from="#FCE9EF" to="#F6CBD7" radius={u(24)} horizontal />
+            <Sheen radius={u(24)} strength={0.55} height="50%" />
+            <MaterialCommunityIcons name="trash-can-outline" size={u(46)} color={RED} />
+            <Text style={text(F.pageSerifBold, 30, 38, RED)}>Cancel Booking</Text>
           </Touchable>
         ) : null}
-      </View>
 
-      {/* ---------- Additional information ---------- */}
-      <View style={[card, { paddingBottom: u(26) }]}>
-        {heading(<Ionicons name="document-text-outline" size={u(30)} color={BURGUNDY} />, 'Additional Information', true)}
-        <View style={[divider, { marginTop: u(13) }]} />
-        {extras.length > 0 ? (
-          <View style={{ gap: u(10), marginTop: u(18), marginHorizontal: u(38) }}>
-            {extras.map(([k, v]) => (
-              <InfoRow key={k} u={u} label={k} value={v} />
-            ))}
-          </View>
-        ) : null}
-        <Touchable
-          onPress={cancelled ? undefined : edit}
-          disabled={cancelled}
-          accessibilityLabel="Edit notes"
-          style={{ flexDirection: 'row', alignItems: 'center', marginTop: u(17), marginLeft: u(38), marginRight: u(35) }}>
-          <View style={circle(72, '#F8E4E6')}>
-            <Ionicons name="document-text-outline" size={u(34)} color={BURGUNDY} />
-          </View>
-          <View style={{ flex: 1, marginLeft: u(29) }}>
-            <Text style={text(F.regular, 18.9, 24, GREY)}>Notes</Text>
-            <Text style={[text(F.medium, 22, 30, INK), { marginTop: u(4) }]}>{booking.notes || '-'}</Text>
-          </View>
-          {!cancelled ? <Ionicons name="chevron-forward" size={u(34)} color="#8E8E93" /> : null}
-        </Touchable>
-      </View>
-
-      {/* ---------- Cancel ---------- */}
-      {!cancelled ? (
-        <Touchable
-          onPress={() => setConfirmCancel(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Cancel Booking"
-          style={{
-            marginHorizontal: u(25),
-            height: u(88),
-            borderRadius: u(22),
-            borderWidth: 1.5,
-            borderColor: '#D0142C',
-            backgroundColor: '#FDF1F0',
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: u(24),
-          }}>
-          <MaterialCommunityIcons name="trash-can-outline" size={u(44)} color={RED} />
-          <Text style={text(F.pageSerifBold, 28.6, 36, RED)}>Cancel Booking</Text>
-        </Touchable>
-      ) : null}
-
-      <View style={{ height: u(40) }} />
+        <View style={{ height: u(40) }} />
       </ScrollView>
 
       <RecordPaymentSheet booking={booking} visible={pay} onClose={() => setPay(false)} />
@@ -413,17 +436,53 @@ function initialsOf(name: string) {
   return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase() || '?';
 }
 
-function PanelSep({ u }: { u: U }) {
-  return <View style={{ width: 1.2, marginVertical: u(18), backgroundColor: '#EBD5C6' }} />;
+/** Blue line under the page title: fades in, a filled diamond with two dots, then fades out. */
+function TitleRule({ u }: { u: U }) {
+  const w = u(290);
+  const h = u(16);
+  const cx = u(110);
+  const cy = h / 2;
+  const r = u(7);
+  return (
+    <Svg width={w} height={h}>
+      <Path d={`M0 ${cy}H${cx - u(22)}M${cx + u(22)} ${cy}H${w}`} stroke={BLUE} strokeOpacity={0.55} strokeWidth={1.2} />
+      <Path d={`M${cx} ${cy - r}L${cx + r} ${cy}L${cx} ${cy + r}L${cx - r} ${cy}Z`} fill={BLUE} />
+      <Path d={`M${cx - u(15)} ${cy}l${u(3)} -${u(3)}l${u(3)} ${u(3)}l-${u(3)} ${u(3)}Z`} fill={BLUE} />
+      <Path d={`M${cx + u(15)} ${cy}l-${u(3)} -${u(3)}l-${u(3)} ${u(3)}l${u(3)} ${u(3)}Z`} fill={BLUE} />
+    </Svg>
+  );
 }
 
-function EventCell({ u, flex, icon, label, value }: { u: U; flex: number; icon: ReactNode; label: string; value: string }) {
+/** 70px glossy orb with a coloured halo, for the customer quick actions. */
+function ActionOrb({ u, tint, glow, children }: { u: U; tint: Tint; glow: string; children: ReactNode }) {
   return (
-    <View style={{ flex, flexDirection: 'row', paddingLeft: u(20), paddingRight: u(2), gap: u(17) }}>
-      <View style={{ marginTop: u(-2) }}>{icon}</View>
+    <GlossTile
+      from={tint.from}
+      to={tint.to}
+      radius={u(35)}
+      style={{
+        width: u(70),
+        height: u(70),
+        boxShadow: `inset 0px 1.5px 0px rgba(255, 255, 255, 1), inset 0px 0px 10px rgba(255, 255, 255, 0.8), 0px 0px 0px 1px rgba(255, 255, 255, 0.6), 0px 0px 16px ${glow}, 0px 4px 10px rgba(31, 58, 112, 0.1)`,
+      }}>
+      {children}
+    </GlossTile>
+  );
+}
+
+function PanelSep({ u }: { u: U }) {
+  return <View style={{ width: 1, marginVertical: u(4), backgroundColor: RULE }} />;
+}
+
+function EventCell({ u, flex, tint, icon, label, value }: { u: U; flex: number; tint: Tint; icon: Mci; label: string; value: string }) {
+  return (
+    <View style={{ flex, flexDirection: 'row', paddingLeft: u(16), paddingRight: u(4), gap: u(16) }}>
+      <GlossTile from={tint.from} to={tint.to} radius={u(14)} style={{ width: u(54), height: u(54) }}>
+        <MaterialCommunityIcons name={icon} size={u(34)} color={tint.fg} />
+      </GlossTile>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontFamily: F.regular, fontSize: u(19.2), lineHeight: u(24), color: GREY }}>{label}</Text>
-        <Text style={{ fontFamily: F.pageSerifBold, fontSize: u(23), lineHeight: u(31), color: INK, marginTop: u(5) }} numberOfLines={2}>
+        <Text style={{ fontFamily: F.regular, fontSize: u(20), lineHeight: u(26), color: GREY }}>{label}</Text>
+        <Text style={{ fontFamily: F.pageSerifBold, fontSize: u(23), lineHeight: u(31), color: INK, marginTop: u(4) }} numberOfLines={2}>
           {value}
         </Text>
       </View>
@@ -434,14 +493,14 @@ function EventCell({ u, flex, icon, label, value }: { u: U; flex: number; icon: 
 function AmountCell({ u, flex, padLeft, label, value, color }: { u: U; flex: number; padLeft: number; label: string; value: number; color: string }) {
   return (
     <View style={{ flex, paddingLeft: u(padLeft), paddingRight: u(8) }}>
-      <Text style={{ fontFamily: F.regular, fontSize: u(19.9), lineHeight: u(26), color: GREY }} numberOfLines={1}>
+      <Text style={{ fontFamily: F.regular, fontSize: u(20), lineHeight: u(26), color: GREY }} numberOfLines={1}>
         {label}
       </Text>
       <Text
-        style={{ fontFamily: F.pageSerifBold, fontSize: u(37.5), lineHeight: u(44), color, marginTop: u(7) }}
+        style={{ fontFamily: F.pageSerifBold, fontSize: u(40), lineHeight: u(48), color, marginTop: u(6) }}
         numberOfLines={1}
         adjustsFontSizeToFit>
-        <Money value={value} u={u} size={37.5} />
+        <Money value={value} u={u} size={40} />
       </Text>
     </View>
   );

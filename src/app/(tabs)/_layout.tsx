@@ -4,9 +4,10 @@ import { Tabs } from 'expo-router/js-tabs';
 import { StyleSheet, Text, View, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { GlassBarBackground } from '@/components/glass-bar';
 import type { IconName } from '@/components/primitives';
 import { useStore } from '@/lib/store';
-import { C, F } from '@/lib/theme';
+import { C, F, TAB_BAR_HEIGHT, tabBarGap } from '@/lib/theme';
 
 /** Outline icon when idle, filled burgundy icon when active. */
 function tabIcon(outline: IconName, filled: IconName) {
@@ -64,13 +65,14 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: C.primary,
-        tabBarInactiveTintColor: C.text,
+        tabBarActiveTintColor: TAB_ACTIVE,
+        tabBarInactiveTintColor: TAB_IDLE,
         tabBarLabel: TabLabel,
-        tabBarStyle: [st.bar, { marginBottom: Math.max(insets.bottom, 10) }],
+        tabBarStyle: [st.bar, { bottom: tabBarGap(insets.bottom) }],
+        tabBarBackground: () => <GlassBarBackground radius={BAR_RADIUS} />,
         tabBarItemStyle: st.item,
         tabBarIconStyle: st.icon,
-        tabBarActiveBackgroundColor: C.primarySoft,
+        tabBarActiveBackgroundColor: 'rgba(206, 223, 250, 0.8)',
         sceneStyle: { backgroundColor: C.bg },
         animation: 'shift',
       }}>
@@ -92,25 +94,36 @@ export default function TabsLayout() {
   );
 }
 
+const BAR_RADIUS = 22;
+/** Blue glass tab bar: navy active tab on a pale blue pill, slate idle tabs. */
+const TAB_ACTIVE = '#1F4488';
+const TAB_IDLE = '#2E3A57';
+
 const st = StyleSheet.create({
-  /** Floating rounded bar; the active tab gets a soft blush pill with a short burgundy bar under its label. */
+  /**
+   * Floating glass capsule over the scrolling content; the active tab gets a pale blue pill with a short
+   * navy bar under its label. Tab screens pad their scroll end with `tabBarClearance`.
+   */
   bar: {
-    height: 72,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: TAB_BAR_HEIGHT,
     marginHorizontal: 13,
     paddingHorizontal: 5,
     paddingTop: 5,
     paddingBottom: 5,
-    borderRadius: 18,
-    backgroundColor: C.surface,
+    borderRadius: BAR_RADIUS,
+    backgroundColor: 'transparent',
     borderTopWidth: 0,
-    shadowColor: '#57152C',
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 3 },
+    shadowColor: '#1F3A70',
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 6 },
     elevation: 6,
   },
   item: {
-    borderRadius: 12,
+    borderRadius: 17,
     marginHorizontal: 2,
     paddingTop: 0,
     paddingBottom: 0,
@@ -120,6 +133,6 @@ const st = StyleSheet.create({
   icon: { marginBottom: 0 },
   labelWrap: { alignItems: 'center', marginTop: 2 },
   label: { fontFamily: F.medium, fontSize: 11, lineHeight: 14 },
-  underline: { width: 24, height: 3, borderRadius: 2, marginTop: 5, backgroundColor: 'transparent' },
-  underlineOn: { backgroundColor: C.primary },
+  underline: { width: 26, height: 3, borderRadius: 2, marginTop: 5, backgroundColor: 'transparent' },
+  underlineOn: { backgroundColor: TAB_ACTIVE },
 });

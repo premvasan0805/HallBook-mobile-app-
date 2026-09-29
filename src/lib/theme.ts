@@ -29,7 +29,7 @@ export const C = {
 
   bg: '#FAF7F2',
   /** Backdrop around the phone column on web. */
-  bgBackdrop: '#EFE8DF',
+  bgBackdrop: '#DCE6F5',
   surface: '#FFFFFF',
   surfaceAlt: '#F4EEE7',
   border: '#E8DFD8',
@@ -50,6 +50,29 @@ export const C = {
   infoSoft: '#E8EEF6',
 
   overlay: 'rgba(36, 31, 33, 0.45)',
+};
+
+/** Blue glass palette for the glass screens and every popup. */
+export const G = {
+  ink: '#131D38',
+  navy: '#1F3A70',
+  blue: '#2F63C0',
+  deep: '#1F3F92',
+  muted: '#5B6275',
+  placeholder: '#8A90A2',
+  /** Gradient for glossy blue buttons and selected pills. */
+  gradFrom: '#4F86E6',
+  gradTo: '#1C48B0',
+  soft: 'rgba(47, 99, 192, 0.08)',
+  rule: 'rgba(31, 58, 112, 0.16)',
+  /** Selected outline + glow around a glass control. */
+  focusBorder: 'rgba(79, 134, 230, 0.85)',
+  focusGlow:
+    'inset 0px 1px 0px rgba(255, 255, 255, 1), 0px 0px 0px 1px rgba(79, 134, 230, 0.2), 0px 0px 10px rgba(79, 134, 230, 0.35)',
+  /** Glow under glossy blue buttons and pills. */
+  buttonGlow:
+    'inset 0px 1px 0px rgba(255, 255, 255, 0.5), 0px 0px 0px 1px rgba(95, 140, 220, 0.35), 0px 0px 12px rgba(70, 125, 230, 0.45), 0px 6px 14px rgba(28, 72, 176, 0.25)',
+  overlay: 'rgba(19, 29, 56, 0.42)',
 };
 
 /** Booking-slot availability. Only for communicating whether a slot can be booked. */
@@ -93,6 +116,35 @@ export function appWidth(windowWidth: number) {
  */
 export const noOutline: TextStyle = Platform.OS === 'web' ? ({ outlineStyle: 'none' } as unknown as TextStyle) : {};
 
+/** Floating tab bar height. The bar overlays content, so tab screens pad their scroll end by `tabBarClearance`. */
+export const TAB_BAR_HEIGHT = 66;
+
+/** Bottom gap under the floating tab bar for a given safe-area inset. */
+export function tabBarGap(insetBottom: number) {
+  return Math.max(insetBottom, 14);
+}
+
+/** Scroll padding that keeps a tab screen's last item clear of the floating glass tab bar. */
+export function tabBarClearance(insetBottom: number) {
+  return TAB_BAR_HEIGHT + tabBarGap(insetBottom) + 12;
+}
+
+/**
+ * Tab bar glass. The backdrop behind the bar is pale (ivory page, white cards), so it uses dark ink
+ * on white frost. Light comes from the top: bright top rim, dimmer sides and bottom.
+ */
+export const glass = {
+  /** Frost fill where the backdrop is blurred (web). */
+  fill: 'rgba(255, 252, 248, 0.64)',
+  /** Near-solid fill where no blur is available (Android, reduced transparency). */
+  fillSolid: 'rgba(255, 253, 250, 0.97)',
+  rimTop: 'rgba(255, 255, 255, 0.95)',
+  rim: 'rgba(255, 255, 255, 0.55)',
+  rimBottom: 'rgba(31, 58, 112, 0.10)',
+  /** Web backdrop filter for the frosted tier. */
+  backdrop: 'blur(22px) saturate(1.6) brightness(1.04)',
+};
+
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24 };
 export const radius = { sm: 10, md: 14, lg: 18, xl: 24, pill: 999 };
 
@@ -101,6 +153,8 @@ export const F = {
   medium: 'Inter_500Medium',
   semibold: 'Inter_600SemiBold',
   bold: 'Inter_700Bold',
+  /** Rounded humanist sans for glass call-to-action labels. */
+  latoBold: 'Lato_700Bold',
   /** Display serif — used sparingly for brand taglines. */
   serif: 'CormorantGaramond_500Medium',
   serifSemibold: 'CormorantGaramond_600SemiBold',

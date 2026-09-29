@@ -4,7 +4,7 @@ import { useState, type ComponentProps, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { MonthPicker, shiftMonth, type YM } from '@/components/calendar';
-import { BrandGradient } from '@/components/decor';
+import { GradientFill, glassSurface, Sheen } from '@/components/glass';
 import { Touchable } from '@/components/primitives';
 import { fmtClock, fmtFull, inr, MONTHS, parseISO, toISO, todayISO } from '@/lib/format';
 import {
@@ -16,7 +16,7 @@ import {
   type SegState,
   type SlotKey,
 } from '@/lib/store';
-import { C, D, elevation, F, S } from '@/lib/theme';
+import { C, D, F, S } from '@/lib/theme';
 
 /** Gold line-art wedding scene (mandapam, couple, priest, temples) for the foot of the date strip. */
 const MANDAP_SCENE = require('../../assets/images/home/mandap-scene.png');
@@ -32,20 +32,30 @@ const DOT: Record<SegState, string> = {
   blocked: S.blocked,
 };
 
-/** Day-cell tints. Priority: muhurtham > special > fully blocked > partly booked > weekend. */
+/** Blue glass palette, shared with Home. */
+const INK = '#131D38';
+const NAVY = '#1F3A70';
+const MUTED = '#5B6275';
+const BLUE_DEEP = '#173F8E';
+const BLUE_BRIGHT = '#3368C4';
+
+/** Translucent day-cell tints over the glass board. Priority: muhurtham > special > fully blocked > partly booked > weekend. */
 const TINT = {
-  muhurtham: '#FCF1DE',
-  special: '#F1ECFA',
-  blocked: '#ECF0F8',
-  partly: '#FCEBEE',
-  weekend: '#F3F1FB',
-  outside: '#F8F5F1',
+  muhurtham: 'rgba(252, 241, 218, 0.9)',
+  special: 'rgba(241, 236, 250, 0.9)',
+  blocked: 'rgba(232, 237, 247, 0.9)',
+  partly: 'rgba(252, 226, 233, 0.9)',
+  weekend: 'rgba(240, 237, 252, 0.85)',
+  plain: 'rgba(255, 255, 255, 0.78)',
+  outside: 'rgba(255, 255, 255, 0.35)',
 };
 const SPECIAL_FG = '#7A2E9E';
-const WEEKEND_FG = '#7065B8';
+const WEEKEND_FG = '#8A4FB0';
 const PARTLY_DOT = '#F2A7BA';
-const MOON_FG = '#6F93D6';
+const MOON_FG = '#4F7BD0';
 const LEAF_FG = '#3E9A5A';
+/** Gold marks and vacant dots on the selected (navy) day. */
+const SEL_GOLD = '#F2CF8A';
 
 /** Waxing (valarpirai) or waning (theipirai) moon phase for a date. */
 export function lunarPhase(types: string[]) {
@@ -60,7 +70,7 @@ function DayMark({ special, weekend, waxing, light }: { special: boolean; weeken
   if (weekend)
     return <MaterialCommunityIcons name="calendar-month-outline" size={10} color={light ? C.onPrimary : WEEKEND_FG} />;
   if (waxing) return <Ionicons name="leaf-outline" size={10} color={light ? '#9FE0AE' : LEAF_FG} />;
-  return <MaterialCommunityIcons name="moon-waning-crescent" size={10} color={light ? C.onPrimary : MOON_FG} />;
+  return <MaterialCommunityIcons name="moon-waning-crescent" size={10} color={light ? SEL_GOLD : MOON_FG} />;
 }
 
 // ---------- Month board ----------
@@ -88,14 +98,15 @@ export function CalendarBoard({
 
   return (
     <View>
-      <View style={st.inner}>
+      <View style={[st.inner, glassSurface('rgba(255, 255, 255, 0.5)', 22)]}>
+        <Sheen radius={22} strength={0.45} height="30%" />
         <View style={st.monthRow}>
           <NavButton icon="chevron-back" label="Previous month" onPress={() => onChangeYm(shiftMonth(ym, -1))} />
           <Touchable style={st.monthTitle} onPress={() => setPicker(true)} accessibilityLabel="Choose month">
             <Text style={st.monthText}>
               {MONTHS[ym.m]} {ym.y}
             </Text>
-            <Ionicons name="chevron-down" size={15} color={C.primary} />
+            <Ionicons name="chevron-down" size={16} color={INK} />
           </Touchable>
           <NavButton icon="chevron-forward" label="Next month" onPress={() => onChangeYm(shiftMonth(ym, 1))} />
         </View>
@@ -142,7 +153,7 @@ export function CalendarBoard({
                         ? TINT.partly
                         : weekend
                           ? TINT.weekend
-                          : C.surface;
+                          : TINT.plain;
                 const isSel = iso === selected;
                 const isToday = iso === today;
                 return (
@@ -154,13 +165,14 @@ export function CalendarBoard({
                     style={[
                       st.cell,
                       { backgroundColor: tint },
-                      tint === C.surface && st.cellPlain,
+                      st.cellGlass,
                       isToday && !isSel && st.cellToday,
                       isSel && st.cellSelected,
                     ]}>
                     {isSel ? (
                       <>
-                        <BrandGradient id={`sel-${iso}`} from={C.gradientTo} to={C.primaryDark} />
+                        <GradientFill from={BLUE_BRIGHT} to={BLUE_DEEP} radius={10} />
+                        <Sheen radius={10} strength={0.3} height="50%" />
                         <View style={st.selRing} pointerEvents="none" />
                       </>
                     ) : null}
@@ -168,12 +180,12 @@ export function CalendarBoard({
                       <DayMark special={special} weekend={weekend} waxing={types.includes('valarpirai')} light={isSel} />
                     </View>
                     {muhurtham ? (
-                      <Ionicons name="star" size={12} color={isSel ? '#F2CF8A' : C.accent} style={st.star} />
+                      <Ionicons name="star" size={12} color={isSel ? SEL_GOLD : C.accent} style={st.star} />
                     ) : null}
                     <Text style={[st.num, isSel && { color: C.onPrimary }]}>{date.getDate()}</Text>
                     <View style={st.dots}>
                       {states.map((s, k) => (
-                        <View key={k} style={[st.dot, { backgroundColor: DOT[s] }]} />
+                        <View key={k} style={[st.dot, { backgroundColor: isSel && s === 'free' ? SEL_GOLD : DOT[s] }]} />
                       ))}
                     </View>
                   </Touchable>
@@ -203,7 +215,7 @@ export function CalendarBoard({
 function NavButton({ icon, label, onPress }: { icon: 'chevron-back' | 'chevron-forward'; label: string; onPress: () => void }) {
   return (
     <Touchable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} hitSlop={6} style={st.nav}>
-      <Ionicons name={icon} size={18} color={C.primary} />
+      <Ionicons name={icon} size={18} color={NAVY} />
     </Touchable>
   );
 }
@@ -214,7 +226,7 @@ function Legend() {
     { label: 'Valarpirai', icon: <Ionicons name="leaf-outline" size={14} color={LEAF_FG} /> },
     { label: 'Theipirai', icon: <MaterialCommunityIcons name="moon-waning-crescent" size={14} color={MOON_FG} /> },
     { label: 'Special', icon: <MaterialCommunityIcons name="asterisk" size={14} color={SPECIAL_FG} /> },
-    { label: 'Weekend', icon: <MaterialCommunityIcons name="calendar-month-outline" size={15} color={C.primary} /> },
+    { label: 'Weekend', icon: <MaterialCommunityIcons name="calendar-month-outline" size={15} color={WEEKEND_FG} /> },
   ];
   const dots = [
     { label: 'Vacant', color: S.vacant },
@@ -280,12 +292,11 @@ const DATE_COL_W = 282;
 
 /** Colors traced from the day-card design. */
 const DAY = {
-  ink: '#1A1414',
-  muted: '#5A5563',
-  rate: '#7A0A2C',
-  gold: '#EFC56E',
-  goldLine: '#E6B762',
-  slotBorder: '#EFE5DA',
+  ink: INK,
+  muted: MUTED,
+  rate: INK,
+  gold: '#F2CF8A',
+  goldLine: 'rgba(255, 255, 255, 0.75)',
   iconBox: '#FCF2E3',
   icon: '#A96A22',
   vacantBg: '#E6F3E8',
@@ -328,23 +339,25 @@ export function DayDetail({
   const tagText = { fontSize: u(40), lineHeight: u(48) };
 
   return (
-    <View style={[st.detail, { borderRadius: u(26) }]} onLayout={(e) => setCardWidth(e.nativeEvent.layout.width)}>
+    <View style={[st.detail, glassSurface('rgba(255, 255, 255, 0.52)', cardWidth ? u(34) : 20)]} onLayout={(e) => setCardWidth(e.nativeEvent.layout.width)}>
       {cardWidth > 0 ? (
         <>
           {/* Date strip: day, month, weekday, moon phase, mandap line art */}
           <View style={[st.dateCol, { width: u(DATE_COL_W) }]}>
-            <BrandGradient id="dateColGrad" from="#8A1535" to="#600A25" />
+            <GradientFill from={BLUE_BRIGHT} to={BLUE_DEEP} radius={0} />
+            <Sheen radius={0} strength={0.25} height="40%" />
             <Image
               source={MANDAP_SCENE}
               contentFit="contain"
+              tintColor="#FFFFFF"
               pointerEvents="none"
-              style={{ position: 'absolute', left: -u(38), bottom: 0, width: u(358), height: u(251), opacity: 0.92 }}
+              style={{ position: 'absolute', left: -u(38), bottom: 0, width: u(358), height: u(251), opacity: 0.7 }}
             />
-            <Text style={[st.colText, serif(183, 164), { color: C.onPrimary, fontVariant: ['lining-nums'] }]}>{d.getDate()}</Text>
+            <Text style={[st.colText, serif(183, 164), { color: '#FFFFFF', fontVariant: ['lining-nums'] }]}>{d.getDate()}</Text>
             <Text style={[st.colText, serif(251, 50), { color: DAY.gold, fontVariant: ['lining-nums'] }]}>
               {MONTHS[d.getMonth()].slice(0, 3).toUpperCase()} {d.getFullYear()}
             </Text>
-            <Text style={[st.colText, serif(313, 50), { color: C.onPrimary }]}>{WEEKDAY_LONG[d.getDay()]}</Text>
+            <Text style={[st.colText, serif(313, 50), { color: '#FFFFFF' }]}>{WEEKDAY_LONG[d.getDay()]}</Text>
             <View
               style={{
                 position: 'absolute',
@@ -362,7 +375,7 @@ export function DayDetail({
                 <MaterialCommunityIcons name="moon-waning-crescent" size={u(72)} color={DAY.gold} />
               )}
             </View>
-            <Text style={[st.colText, serif(521, 47), { color: C.onPrimary }]}>{phase.label}</Text>
+            <Text style={[st.colText, serif(521, 47), { color: '#FFFFFF' }]}>{phase.label}</Text>
           </View>
 
           <View style={{ flex: 1, paddingLeft: u(31), paddingRight: u(34), paddingBottom: u(40) }}>
@@ -447,7 +460,8 @@ export function DayDetail({
                       accessibilityLabel={`Book ${s.label}`}
                       hitSlop={BTN_SLOP}
                       style={[st.actBtn, btn]}>
-                      <BrandGradient id={`bookGrad-${s.key}`} from="#9B2344" to="#7A1130" />
+                      <GradientFill from={BLUE_BRIGHT} to={BLUE_DEEP} radius={u(20)} />
+                      <Sheen radius={u(20)} strength={0.3} height="50%" />
                       <Ionicons name="add" size={u(66)} color={C.onPrimary} />
                       <Text style={[st.actText, btnText]}>Book</Text>
                     </Touchable>
@@ -458,14 +472,16 @@ export function DayDetail({
                       accessibilityLabel={`View ${s.label} booking`}
                       hitSlop={BTN_SLOP}
                       style={[st.actBtn, btn, st.viewBtn, { gap: u(14) }]}>
-                      <Text style={[st.actText, btnText, { color: C.primary }]}>View</Text>
-                      <Ionicons name="chevron-forward" size={u(48)} color={C.primary} />
+                      <Text style={[st.actText, btnText, { color: BLUE_DEEP }]}>View</Text>
+                      <Ionicons name="chevron-forward" size={u(48)} color={BLUE_DEEP} />
                     </Touchable>
                   ) : (
                     <View style={btn} />
                   );
                 return (
-                  <View key={s.key} style={[st.slot, { height: u(175), borderRadius: u(28), paddingLeft: u(18), paddingRight: u(20) }]}>
+                  <View
+                    key={s.key}
+                    style={[st.slot, glassSurface('rgba(255, 255, 255, 0.7)', u(28)), { height: u(175), paddingLeft: u(18), paddingRight: u(20) }]}>
                     <View style={[st.slotIcon, { width: u(112), height: u(120), borderRadius: u(24) }]}>
                       {icon.lib === 'mci' ? (
                         <MaterialCommunityIcons name={icon.name} size={u(80)} color={DAY.icon} />
@@ -520,69 +536,52 @@ export function DayDetail({
 }
 
 const st = StyleSheet.create({
-  inner: {
-    backgroundColor: C.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#F1E9E2',
-    paddingHorizontal: 10,
-    paddingTop: 12,
-    paddingBottom: 12,
-    ...elevation,
-    shadowOpacity: 0.04,
-  },
+  inner: { paddingHorizontal: 10, paddingTop: 12, paddingBottom: 12 },
   monthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, paddingHorizontal: 5 },
   nav: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: '#EFE7E0',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.95)',
     alignItems: 'center',
     justifyContent: 'center',
-    ...elevation,
+    boxShadow: 'inset 0px 1.5px 0px rgba(255, 255, 255, 1), 0px 4px 10px rgba(31, 58, 112, 0.14)',
   },
   monthTitle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4, paddingHorizontal: 8 },
-  monthText: { fontFamily: F.serifBold, fontSize: 23, lineHeight: 28, color: C.text, fontVariant: ['lining-nums'] },
+  monthText: { fontFamily: F.serifBold, fontSize: 24, lineHeight: 29, color: INK, fontVariant: ['lining-nums'] },
   row: { flexDirection: 'row', gap: 5 },
   weekday: {
     flex: 1,
     textAlign: 'center',
     fontFamily: F.regular,
     fontSize: 11,
-    color: C.textSecondary,
+    color: MUTED,
     paddingBottom: 7,
   },
   /** Wider than tall, like the printed wall calendars halls keep at the desk. */
   cell: {
     flex: 1,
-    height: 43,
-    borderRadius: 8,
+    height: 44,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     overflow: 'hidden',
   },
-  cellPlain: {
+  /** Frosted tile: bright top rim, faint drop shadow. */
+  cellGlass: {
     borderWidth: 1,
-    borderColor: '#EEE5DE',
-    shadowColor: '#57152C',
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
+    borderColor: 'rgba(255, 255, 255, 0.95)',
+    boxShadow: 'inset 0px 1.5px 0px rgba(255, 255, 255, 1), 0px 2px 6px rgba(31, 58, 112, 0.07)',
   },
-  cellOutside: { backgroundColor: TINT.outside },
-  cellToday: { borderWidth: 1.5, borderColor: C.primary },
+  cellOutside: { backgroundColor: TINT.outside, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.7)' },
+  cellToday: { borderWidth: 1.5, borderColor: BLUE_BRIGHT },
   cellSelected: {
     borderWidth: 1.5,
-    borderColor: C.primaryDark,
-    shadowColor: '#57152C',
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
+    borderColor: '#0F2F72',
+    boxShadow: '0px 5px 12px rgba(23, 63, 142, 0.4)',
   },
   selRing: {
     position: 'absolute',
@@ -590,34 +589,34 @@ const st = StyleSheet.create({
     left: 2,
     right: 2,
     bottom: 2,
-    borderRadius: 6,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.55)',
+    borderColor: 'rgba(255, 255, 255, 0.4)',
   },
   mark: { position: 'absolute', top: 8, left: 4 },
-  num: { fontFamily: F.semibold, fontSize: 12.5, lineHeight: 15, color: C.text, paddingLeft: 3 },
-  numOutside: { fontFamily: F.regular, fontSize: 12.5, color: '#CFC6BF' },
+  num: { fontFamily: F.semibold, fontSize: 12.5, lineHeight: 15, color: INK, paddingLeft: 3 },
+  numOutside: { fontFamily: F.regular, fontSize: 12.5, color: '#A9B1C4' },
   star: { position: 'absolute', top: 5, right: 4 },
   dots: { flexDirection: 'row', gap: 3.5 },
   dot: { width: 5.5, height: 5.5, borderRadius: 3 },
 
-  legend: { marginTop: 12, backgroundColor: '#F8F4EF', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11 },
+  legend: {
+    marginTop: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
   legendRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 6, columnGap: 4 },
-  legendRule: { height: 1, backgroundColor: '#ECE3DA', marginVertical: 8 },
+  legendRule: { height: 1, backgroundColor: 'rgba(31, 58, 112, 0.1)', marginVertical: 8 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendText: { fontFamily: F.regular, fontSize: 10, color: C.text },
+  legendText: { fontFamily: F.regular, fontSize: 10, color: INK },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
 
-  detail: {
-    flexDirection: 'row',
-    minHeight: 200,
-    backgroundColor: '#FFFDF9',
-    borderWidth: 1,
-    borderColor: '#F1D9C2',
-    overflow: 'hidden',
-    boxShadow: '0px 4px 14px rgba(87, 21, 44, 0.08)',
-  },
-  dateCol: { alignSelf: 'stretch', overflow: 'hidden', backgroundColor: '#700F2D' },
+  detail: { flexDirection: 'row', minHeight: 200, overflow: 'hidden' },
+  dateCol: { alignSelf: 'stretch', overflow: 'hidden', backgroundColor: BLUE_DEEP },
   rateRow: { flexDirection: 'row', alignItems: 'baseline' },
   colText: { position: 'absolute', left: 0, right: 0, textAlign: 'center' },
   colIcon: { position: 'absolute', left: 0, right: 0, alignItems: 'center', justifyContent: 'center' },
@@ -625,14 +624,7 @@ const st = StyleSheet.create({
   chip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: DAY.vacantBg },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap' },
   tagText: { fontFamily: F.pageSerif },
-  slot: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFDF9',
-    borderWidth: 1,
-    borderColor: DAY.slotBorder,
-    boxShadow: '0px 1px 3px rgba(87, 21, 44, 0.04)',
-  },
+  slot: { flexDirection: 'row', alignItems: 'center' },
   slotIcon: { backgroundColor: DAY.iconBox, alignItems: 'center', justifyContent: 'center' },
   pill: { alignItems: 'center', justifyContent: 'center' },
   actBtn: {
@@ -640,8 +632,10 @@ const st = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    boxShadow: '0px 2px 5px rgba(87, 21, 44, 0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.55)',
+    boxShadow: '0px 4px 10px rgba(23, 63, 142, 0.3)',
   },
-  viewBtn: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.primary, boxShadow: 'none' },
+  viewBtn: { backgroundColor: 'rgba(255, 255, 255, 0.8)', borderColor: BLUE_DEEP, boxShadow: 'none' },
   actText: { fontFamily: F.pageSerif, color: C.onPrimary },
 });
