@@ -4,9 +4,10 @@ import { Text } from 'react-native';
 import { SegmentedTabs } from '@/components/form';
 import { Screen } from '@/components/primitives';
 import { ToggleList } from '@/components/toggle-list';
-import { T } from '@/lib/theme';
+import { useTheme } from '@/lib/theme-context';
 
 export default function AppSettingsScreen() {
+  const { T } = useTheme();
   const [lang, setLang] = useState<'en' | 'ta'>('en');
   const [v, setV] = useState<Record<string, boolean>>({ compact: false, haptics: true });
   return (

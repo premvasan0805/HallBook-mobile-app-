@@ -7,7 +7,8 @@ import { BottomSheet } from '@/components/overlays';
 import { MONTHS, parseISO, toISO, todayISO } from '@/lib/format';
 import { useStore, type DateType } from '@/lib/store';
 import { glassSurface, GradientFill, Sheen } from '@/components/glass';
-import { C, D, F, G, S } from '@/lib/theme';
+import { F, type Theme } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/lib/theme-context';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -38,40 +39,50 @@ export function useDayAvailability() {
   };
 }
 
-const DOT: Record<Exclude<DayAvailability, 'free'>, string> = {
-  booked: S.booked,
-  partial: S.partial,
-  tentative: S.tentative,
-  blocked: S.blocked,
-};
+/** Availability dots (overview and date sheet). */
+const dotTone = (t: Theme): Record<Exclude<DayAvailability, 'free'>, string> => ({
+  booked: t.S.booked,
+  partial: t.S.partial,
+  tentative: t.S.tentative,
+  blocked: t.S.blocked,
+});
 
-const KIND_BG: Record<DateType, string> = {
-  muhurtham: D.muhurtham.bg,
-  valarpirai: D.valarpirai.bg,
-  special: D.special.bg,
-  holiday: D.holiday.bg,
-};
+const kindBg = (t: Theme): Record<DateType, string> => ({
+  muhurtham: t.D.muhurtham.bg,
+  valarpirai: t.D.valarpirai.bg,
+  special: t.D.special.bg,
+  holiday: t.D.holiday.bg,
+});
 
 /** Date-sheet tile tints: a little richer than the overview so they read on frosted glass. */
-const KIND_BOXED: Record<DateType, { bg: string; fg?: string }> = {
-  muhurtham: { bg: '#FBEFD2', fg: '#B0700E' },
-  valarpirai: { bg: '#EAE6FA' },
-  special: { bg: '#D5F0E8' },
-  holiday: { bg: '#FAE3EA' },
-};
+const kindBoxed = (t: Theme): Record<DateType, { bg: string; fg?: string }> =>
+  t.dark
+    ? {
+        muhurtham: { bg: 'rgba(201, 164, 94, 0.2)', fg: t.D.muhurtham.fg },
+        valarpirai: { bg: 'rgba(183, 162, 224, 0.18)' },
+        special: { bg: 'rgba(124, 196, 206, 0.18)' },
+        holiday: { bg: 'rgba(227, 148, 166, 0.18)' },
+      }
+    : {
+        muhurtham: { bg: '#F9F0DA', fg: '#9A6A1E' },
+        valarpirai: { bg: '#ECE8F8' },
+        special: { bg: '#DCF0EA' },
+        holiday: { bg: '#F9E6EC' },
+      };
+
+/** Legend dots for the date-sheet tile tints (a shade stronger than the tiles so they read at 9px). */
+const kindLegend = (t: Theme) =>
+  t.dark
+    ? { muhurtham: 'rgba(201, 164, 94, 0.55)', valarpirai: 'rgba(183, 162, 224, 0.5)', special: 'rgba(124, 196, 206, 0.5)' }
+    : { muhurtham: '#F1E2C2', valarpirai: '#DDD8F2', special: '#C4E6DC' };
 
 /** Legend column widths in the date sheet; the first holds "Partly booked". */
 const LEGEND_COLS = ['31%', '26%', '21%', '22%'] as const;
 
-/** Availability dots in the date sheet. */
-const DOT_BOXED: Record<string, string> = {
-  booked: '#E0143C',
-  partial: '#F28DA0',
-  tentative: '#F0A419',
-  blocked: '#7B86A0',
-};
-
 export function MonthHeader({ ym, onChange, boxed }: { ym: YM; onChange: (v: YM) => void; boxed?: boolean }) {
+  const t = useTheme();
+  const st = useSt();
+  const G = t.G;
   const [picker, setPicker] = useState(false);
   const nav = (dir: -1 | 1) =>
     boxed ? (
@@ -136,9 +147,14 @@ export function CalendarGrid({
   /** Bordered day tiles with the dot inside, as in the booking date sheet. */
   boxed?: boolean;
 }) {
+  const t = useTheme();
+  const st = useSt();
   const { typesFor } = useStore();
   const availability = useDayAvailability();
   const today = todayISO();
+  const DOT = dotTone(t);
+  const KIND_BG = kindBg(t);
+  const KIND_BOXED = kindBoxed(t);
 
   const lead = (new Date(ym.y, ym.m, 1).getDay() + 6) % 7;
   const days = new Date(ym.y, ym.m + 1, 0).getDate();
@@ -193,20 +209,20 @@ export function CalendarGrid({
                       isToday && st.tileToday,
                       isSel && st.tileSelected,
                     ]}>
-                    {isSel ? <GradientFill from={G.gradFrom} to={G.gradTo} radius={10} /> : null}
+                    {isSel ? <GradientFill from={t.G.gradFrom} to={t.G.gradTo} radius={10} /> : null}
                     {isSel ? <Sheen radius={10} strength={0.35} height="50%" /> : null}
                     <Text
                       style={[
                         st.tileText,
                         muhurtham && { color: KIND_BOXED.muhurtham.fg },
                         avail === 'blocked' && st.strike,
-                        (isToday || isSel) && { fontFamily: F.bold },
-                        isToday && !isSel && { color: G.navy },
-                        isSel && { color: C.onPrimary },
+                        (isToday || isSel) && { fontFamily: F.semibold },
+                        isToday && !isSel && { color: t.G.navy },
+                        isSel && { color: t.G.onBlue },
                       ]}>
                       {parseISO(iso).getDate()}
                     </Text>
-                    <View style={[st.tileDot, avail !== 'free' && { backgroundColor: isSel ? C.onPrimary : DOT_BOXED[avail] }]} />
+                    <View style={[st.tileDot, avail !== 'free' && { backgroundColor: isSel ? t.G.onBlue : DOT[avail] }]} />
                   </View>
                 </Cell>
               );
@@ -228,9 +244,9 @@ export function CalendarGrid({
                   <Text
                     style={[
                       st.dayText,
-                      kind === 'muhurtham' && showIndicators && { color: D.muhurtham.fg, fontFamily: F.semibold },
+                      kind === 'muhurtham' && showIndicators && { color: t.D.muhurtham.fg, fontFamily: F.semibold },
                       avail === 'blocked' && st.strike,
-                      isSel && { color: C.onPrimary, fontFamily: F.semibold },
+                      isSel && { color: t.G.onBlue, fontFamily: F.semibold },
                     ]}>
                     {parseISO(iso).getDate()}
                   </Text>
@@ -246,16 +262,20 @@ export function CalendarGrid({
 }
 
 export function CalendarLegend({ boxed }: { boxed?: boolean }) {
+  const t = useTheme();
+  const st = useSt();
+  const DOT = dotTone(t);
   if (boxed) {
     // Date sheet: every key is a round dot, laid out in four columns.
+    const kl = kindLegend(t);
     const keys = [
-      { c: '#F6E3BE', l: 'Muhurtham' },
-      { c: '#DCD6F7', l: 'Valarpirai' },
-      { c: '#BDE8DD', l: 'Special' },
-      { c: DOT_BOXED.booked, l: 'Booked' },
-      { c: DOT_BOXED.partial, l: 'Partly booked' },
-      { c: DOT_BOXED.tentative, l: 'Tentative' },
-      { c: DOT_BOXED.blocked, l: 'Blocked' },
+      { c: kl.muhurtham, l: 'Muhurtham' },
+      { c: kl.valarpirai, l: 'Valarpirai' },
+      { c: kl.special, l: 'Special' },
+      { c: DOT.booked, l: 'Booked' },
+      { c: DOT.partial, l: 'Partly booked' },
+      { c: DOT.tentative, l: 'Tentative' },
+      { c: DOT.blocked, l: 'Blocked' },
     ];
     return (
       <View style={st.legendBoxed}>
@@ -271,26 +291,26 @@ export function CalendarLegend({ boxed }: { boxed?: boolean }) {
     );
   }
   const tints = [
-    { c: D.muhurtham.bg, l: 'Muhurtham', square: true },
-    { c: D.valarpirai.bg, l: 'Valarpirai', square: true },
-    { c: D.special.bg, l: 'Special', square: true },
-    { c: S.booked, l: 'Booked' },
-    { c: S.partial, l: 'Partly booked' },
-    { c: S.tentative, l: 'Tentative' },
-    { c: S.blocked, l: 'Blocked' },
+    { c: t.D.muhurtham.bg, l: 'Muhurtham', square: true },
+    { c: t.D.valarpirai.bg, l: 'Valarpirai', square: true },
+    { c: t.D.special.bg, l: 'Special', square: true },
+    { c: t.S.booked, l: 'Booked' },
+    { c: t.S.partial, l: 'Partly booked' },
+    { c: t.S.tentative, l: 'Tentative' },
+    { c: t.S.blocked, l: 'Blocked' },
   ];
   return (
     <View style={boxed ? st.legendBoxed : st.legend}>
-      {tints.map((t) => (
-        <View key={t.l} style={[st.legendItem, boxed && st.legendItemBoxed]}>
+      {tints.map((k) => (
+        <View key={k.l} style={[st.legendItem, boxed && st.legendItemBoxed]}>
           <View
             style={
-              t.square
-                ? { width: 12, height: 12, borderRadius: 4, backgroundColor: t.c, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.95)' }
-                : { width: 7, height: 7, borderRadius: 4, backgroundColor: t.c }
+              k.square
+                ? { width: 12, height: 12, borderRadius: 4, backgroundColor: k.c, borderWidth: 1, borderColor: t.glassBorder }
+                : { width: 7, height: 7, borderRadius: 4, backgroundColor: k.c }
             }
           />
-          <Text style={st.legendText}>{t.l}</Text>
+          <Text style={st.legendText}>{k.l}</Text>
         </View>
       ))}
     </View>
@@ -308,6 +328,8 @@ export function MonthPicker({
   onClose: () => void;
   onPick: (v: YM) => void;
 }) {
+  const t = useTheme();
+  const st = useSt();
   const [year, setYear] = useState(value.y);
   return (
     <BottomSheet visible={visible} onClose={onClose} title="Choose month">
@@ -324,7 +346,7 @@ export function MonthPicker({
               key={name}
               onPress={() => onPick({ y: year, m: i })}
               style={[st.monthCell, on && st.monthCellOn]}>
-              <Text style={[st.monthCellText, on && { color: '#FFFFFF', fontFamily: F.semibold }]}>{name.slice(0, 3)}</Text>
+              <Text style={[st.monthCellText, on && { color: t.G.onBlue, fontFamily: F.semibold }]}>{name.slice(0, 3)}</Text>
             </Touchable>
           );
         })}
@@ -333,84 +355,89 @@ export function MonthPicker({
   );
 }
 
-const SELECTED_GLOW =
-  'inset 0px 1px 0px rgba(255, 255, 255, 0.45), 0px 0px 0px 1px rgba(95, 140, 220, 0.35), 0px 0px 10px rgba(70, 125, 230, 0.5), 0px 3px 8px rgba(28, 72, 176, 0.25)';
-
-const st = StyleSheet.create({
-  monthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  monthTitle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 8 },
-  monthPlain: { fontFamily: F.pageSerifBold, fontSize: 17, lineHeight: 22, color: G.ink },
-  row: { flexDirection: 'row' },
-  weekday: {
-    flex: 1,
-    textAlign: 'center',
-    fontFamily: F.medium,
-    fontSize: 11,
-    color: G.muted,
-    paddingVertical: 7,
-  },
-  cell: { flex: 1, alignItems: 'center', paddingVertical: 3, minHeight: 46 },
-  day: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  today: { borderWidth: 1.5, borderColor: G.blue },
-  daySelected: { backgroundColor: G.blue, borderWidth: 1.5, borderColor: 'rgba(255, 255, 255, 0.95)', boxShadow: SELECTED_GLOW },
-  dayText: { fontFamily: F.medium, fontSize: 13.5, color: G.ink },
-  strike: { textDecorationLine: 'line-through', color: C.textMuted },
-  dot: { width: 5, height: 5, borderRadius: 3, marginTop: 3 },
-  legend: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 14, rowGap: 8, marginTop: 12 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendBoxed: {
-    ...glassSurface('rgba(255, 255, 255, 0.6)', 12, 'rgba(31, 58, 112, 0.05)'),
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    rowGap: 10,
-    marginTop: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  legendItemBoxed: { gap: 7 },
-  legendTextBoxed: { fontSize: 11.5, color: '#3A4258' },
-  legendText: { fontFamily: F.regular, fontSize: 10.5, color: G.muted },
-
-  navBoxed: {
-    ...glassSurface('rgba(255, 255, 255, 0.72)', 16, 'rgba(31, 58, 112, 0.08)'),
-    width: 34,
-    height: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  monthBoxed: { fontFamily: F.pageSerifBold, fontSize: 19.5, lineHeight: 25, letterSpacing: -0.3, color: G.ink },
-  cellBoxed: { flex: 1, paddingHorizontal: 3.5, paddingVertical: 3.5 },
-  tile: {
-    height: 36,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.95)',
-    backgroundColor: 'rgba(255, 255, 255, 0.66)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 3,
-    boxShadow: 'inset 0px 1px 0px rgba(255, 255, 255, 1), 0px 2px 5px rgba(31, 58, 112, 0.06)',
-  },
-  tileToday: { borderWidth: 2, borderColor: G.navy, backgroundColor: 'rgba(255, 255, 255, 0.85)' },
-  tileSelected: { borderWidth: 1.5, borderColor: 'rgba(255, 255, 255, 0.95)', boxShadow: SELECTED_GLOW },
-  tileText: { fontFamily: F.regular, fontSize: 13.5, lineHeight: 17, color: G.ink },
-  tileDot: { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
-  pickerYear: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  monthGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  monthCell: {
-    ...glassSurface('rgba(255, 255, 255, 0.62)', 12, 'rgba(31, 58, 112, 0.05)'),
-    width: '30%',
-    flexGrow: 1,
-    minHeight: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  monthCellOn: { backgroundColor: G.blue, boxShadow: SELECTED_GLOW },
-  monthCellText: { fontFamily: F.medium, fontSize: 13, color: G.ink },
+const useSt = makeStyles((t) => {
+  const G = t.G;
+  /** Soft ring + drop under the selected day/month (no neon glow). */
+  const SELECTED_GLOW = G.buttonGlow;
+  return StyleSheet.create({
+    monthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    monthTitle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 8 },
+    monthPlain: { fontFamily: F.semibold, fontSize: 16, lineHeight: 20, letterSpacing: -0.2, color: G.ink },
+    row: { flexDirection: 'row' },
+    weekday: {
+      flex: 1,
+      textAlign: 'center',
+      fontFamily: F.medium,
+      fontSize: 11,
+      letterSpacing: 0.3,
+      color: G.muted,
+      paddingVertical: 7,
+    },
+    cell: { flex: 1, alignItems: 'center', paddingVertical: 3, minHeight: 46 },
+    day: {
+      width: 34,
+      height: 34,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    today: { borderWidth: 1.5, borderColor: G.blue },
+    daySelected: { backgroundColor: G.blue, borderWidth: 1.5, borderColor: G.buttonBorder, boxShadow: SELECTED_GLOW },
+    dayText: { fontFamily: F.medium, fontSize: 13.5, color: G.ink },
+    strike: { textDecorationLine: 'line-through', color: t.C.textMuted },
+    dot: { width: 5, height: 5, borderRadius: 3, marginTop: 3 },
+    legend: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 14, rowGap: 8, marginTop: 12 },
+    legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    legendBoxed: {
+      ...glassSurface(t, t.frost(0.6), 12),
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      rowGap: 10,
+      marginTop: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    legendItemBoxed: { gap: 7 },
+    legendTextBoxed: { fontFamily: F.medium, fontSize: 11, color: G.navy },
+    legendText: { fontFamily: F.regular, fontSize: 10.5, color: G.muted },
+  
+    navBoxed: {
+      ...glassSurface(t, t.frost(0.72), 16),
+      width: 34,
+      height: 34,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    monthBoxed: { fontFamily: F.semibold, fontSize: 18, lineHeight: 23, letterSpacing: -0.3, color: G.ink },
+    cellBoxed: { flex: 1, paddingHorizontal: 3.5, paddingVertical: 3.5 },
+    tile: {
+      height: 36,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: t.dark ? 'rgba(255, 255, 255, 0.08)' : t.glassBorder,
+      backgroundColor: t.frost(0.66),
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingTop: 3,
+      boxShadow: t.dark
+        ? 'inset 0px 1px 0px rgba(255, 255, 255, 0.05)'
+        : 'inset 0px 1px 0px rgba(255, 255, 255, 0.85), 0px 2px 5px rgba(30, 30, 30, 0.05)',
+    },
+    tileToday: { borderWidth: 2, borderColor: G.navy, backgroundColor: t.frost(0.85) },
+    tileSelected: { borderWidth: 1.5, borderColor: G.buttonBorder, boxShadow: SELECTED_GLOW },
+    tileText: { fontFamily: F.medium, fontSize: 13, lineHeight: 17, color: G.ink },
+    tileDot: { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
+    pickerYear: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    monthGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    monthCell: {
+      ...glassSurface(t, t.frost(0.62), 12),
+      width: '30%',
+      flexGrow: 1,
+      minHeight: 42,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    monthCellOn: { backgroundColor: G.blue, boxShadow: SELECTED_GLOW },
+    monthCellText: { fontFamily: F.medium, fontSize: 13, color: G.ink },
+  });
 });

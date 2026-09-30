@@ -38,47 +38,45 @@ import {
   type BookingStatus,
   type SlotKey,
 } from '@/lib/store';
-import { C, F, noOutline, radius, T } from '@/lib/theme';
+import { F, noOutline, radius, type Theme } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/lib/theme-context';
 
 type IonName = ComponentProps<typeof Ionicons>['name'];
 
-/** Event-type chips: tinted pills; unknown (user-added) types fall back to burgundy. */
-const EVENT_META: Record<string, { icon: MciName; fg: string; bg: string }> = {
-  Wedding: { icon: 'ring', fg: '#A8671A', bg: '#FDF3E4' },
-  Engagement: { icon: 'account-multiple-outline', fg: '#2E7D4F', bg: '#E7F2EA' },
-  Party: { icon: 'glass-wine', fg: '#7B4FA6', bg: '#F0E8F7' },
-  'Family Function': { icon: 'cake-variant-outline', fg: '#B3264F', bg: '#FBE9EE' },
-  Reception: { icon: 'office-building-outline', fg: '#3E6A9E', bg: '#E8EEF6' },
-  'Company Function': { icon: 'briefcase-outline', fg: '#1F7A7A', bg: '#E3F2F1' },
-};
-const EVENT_FALLBACK = { icon: 'calendar-star' as MciName, fg: C.primary, bg: C.primarySoft };
-
-/** Blue glass palette shared with the tab screens. */
-const INK = '#131D38';
-const BLUE = '#2F63C0';
-const MUTED = '#5B6275';
-
-/** Pastel gradients for icon tiles. */
+/** Theme tile tone behind each icon-tile name used on this screen. */
 const TILE = {
-  blue: ['#EEF5FE', '#D3E4FB'],
-  lilac: ['#F3EEFD', '#E0D6F8'],
-  mint: ['#EAF8F2', '#CFEFE3'],
-  sun: ['#FFF8E8', '#FCE7BE'],
-  rose: ['#FEF0F3', '#FAD6DE'],
-  sky: ['#EAF8FB', '#CBEBF3'],
+  blue: 'blue',
+  lilac: 'violet',
+  mint: 'mint',
+  sun: 'sand',
+  rose: 'rose',
+  sky: 'blue',
 } as const;
 type Tone = keyof typeof TILE;
 
-/** Sky icon and tile tone per booking slot. */
-const SLOT_LOOK: Record<SlotKey, { icon: MciName; fg: string; tile: readonly [string, string] }> = {
-  full: { icon: 'white-balance-sunny', fg: '#F29A0E', tile: TILE.sun },
-  first: { icon: 'weather-sunset-up', fg: '#D23A5E', tile: TILE.rose },
-  second: { icon: 'moon-waning-crescent', fg: '#6A45D0', tile: TILE.lilac },
-  early: { icon: 'weather-sunset-up', fg: '#1F8FA6', tile: TILE.sky },
+/** Event-type chips: tinted pills; unknown (user-added) types fall back to the primary blue. */
+const EVENT_ICON: Record<string, { icon: MciName; tone: Tone }> = {
+  Wedding: { icon: 'ring', tone: 'sun' },
+  Engagement: { icon: 'account-multiple-outline', tone: 'mint' },
+  Party: { icon: 'glass-wine', tone: 'lilac' },
+  'Family Function': { icon: 'cake-variant-outline', tone: 'rose' },
+  Reception: { icon: 'office-building-outline', tone: 'blue' },
+  'Company Function': { icon: 'briefcase-outline', tone: 'sky' },
 };
+function eventMeta(t: Theme, type: string): { icon: MciName; fg: string; bg: string } {
+  const e = EVENT_ICON[type];
+  if (!e) return { icon: 'calendar-star', fg: t.C.primary, bg: t.C.primarySoft };
+  const tone = t.tone[TILE[e.tone]];
+  return { icon: e.icon, fg: tone.fg, bg: tone.to };
+}
 
-/** Frosted input surface shared by fields, the event-type select and the customer picker. */
-const INPUT_GLASS = glassSurface('rgba(255, 255, 255, 0.62)', 10, 'rgba(31, 58, 112, 0.05)');
+/** Sky icon and tile tone per booking slot. */
+const SLOT_LOOK: Record<SlotKey, { icon: MciName; tile: Tone }> = {
+  full: { icon: 'white-balance-sunny', tile: 'sun' },
+  first: { icon: 'weather-sunset-up', tile: 'rose' },
+  second: { icon: 'moon-waning-crescent', tile: 'lilac' },
+  early: { icon: 'weather-sunset-up', tile: 'sky' },
+};
 
 const STATUS_OPTIONS: { key: Exclude<BookingStatus, 'cancelled'>; label: string; icon: IonName }[] = [
   { key: 'confirmed', label: 'Confirmed', icon: 'checkmark-circle-outline' },
@@ -90,6 +88,8 @@ export default function BookingFormScreen() {
   const params = useLocalSearchParams<{ date?: string; customerId?: string; id?: string; slot?: SlotKey }>();
   const store = useStore();
   const toast = useToast();
+  const t = useTheme();
+  const st = useSt();
   const editing = params.id ? store.bookings.find((b) => b.id === params.id) : undefined;
   const today = todayISO();
 
@@ -202,12 +202,12 @@ export default function BookingFormScreen() {
   };
 
   const addType = () => {
-    const t = newType?.trim();
-    if (!t) return;
+    const name = newType?.trim();
+    if (!name) return;
     // Re-typing an existing type just selects it instead of adding a duplicate.
-    const existing = store.eventTypes.find((e) => e.toLowerCase() === t.toLowerCase());
-    if (!existing) store.addEventType(t);
-    setEventType(existing ?? t);
+    const existing = store.eventTypes.find((e) => e.toLowerCase() === name.toLowerCase());
+    if (!existing) store.addEventType(name);
+    setEventType(existing ?? name);
     setNewType(null);
   };
 
@@ -228,7 +228,7 @@ export default function BookingFormScreen() {
           {/* Event date */}
           <View style={[st.card, st.dateCard]}>
             <Sheen radius={16} strength={0.45} />
-            <Tile tone="blue" icon={<MaterialCommunityIcons name="calendar-blank-outline" size={19} color={BLUE} />} />
+            <Tile tone="blue" icon={<MaterialCommunityIcons name="calendar-blank-outline" size={19} color={t.G.blue} />} />
             <View style={{ flex: 1 }}>
               <Text style={st.overline}>Event Date</Text>
               <Text style={st.dateText} numberOfLines={1}>
@@ -242,18 +242,19 @@ export default function BookingFormScreen() {
               }}
               accessibilityRole="button"
               style={st.outlineBtn}>
-              <MaterialCommunityIcons name="calendar-month-outline" size={15} color={BLUE} />
+              <MaterialCommunityIcons name="calendar-month-outline" size={15} color={t.G.blue} />
               <Text style={st.outlineBtnText}>{date ? 'Change Date' : 'Select Date'}</Text>
             </Touchable>
           </View>
 
           {/* Time slot */}
-          <Section tone="lilac" icon={<Ionicons name="time-outline" size={18} color="#3A55A8" />} title="Select Time Slot">
+          <Section tone="lilac" icon={<Ionicons name="time-outline" size={18} color={t.G.navy} />} title="Select Time Slot">
             <View style={st.slotGrid}>
               {SLOT_ORDER.map((k) => {
                 const free = slotFree(k);
                 const on = slot === k;
                 const m = SLOT_LOOK[k];
+                const tone = t.tone[TILE[m.tile]];
                 return (
                   <Touchable
                     key={k}
@@ -261,10 +262,10 @@ export default function BookingFormScreen() {
                     onPress={() => setSlot(k)}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: on, disabled: !free }}
-                    style={[st.slot, on && st.slotOn, !free && { opacity: 0.45 }]}>
+                    style={[st.slot, on && st.slotOn, !free && { opacity: t.dark ? 0.55 : 0.45 }]}>
                     <Sheen radius={12} strength={0.5} height="45%" />
-                    <GlossTile from={m.tile[0]} to={m.tile[1]} radius={9} style={st.slotIcon}>
-                      <MaterialCommunityIcons name={m.icon} size={19} color={m.fg} />
+                    <GlossTile from={tone.from} to={tone.to} radius={9} style={st.slotIcon}>
+                      <MaterialCommunityIcons name={m.icon} size={19} color={tone.fg} />
                     </GlossTile>
                     <View style={{ flex: 1 }}>
                       <Text style={st.slotTitle} numberOfLines={1}>
@@ -275,7 +276,7 @@ export default function BookingFormScreen() {
                       </Text>
                     </View>
                     {on ? (
-                      <Ionicons name="checkmark-circle" size={15} color={BLUE} style={st.slotMark} />
+                      <Ionicons name="checkmark-circle" size={15} color={t.G.blue} style={st.slotMark} />
                     ) : (
                       <View style={[st.slotMark, st.radio]} />
                     )}
@@ -286,7 +287,7 @@ export default function BookingFormScreen() {
           </Section>
 
           {/* Customer */}
-          <Section tone="lilac" icon={<Ionicons name="people-outline" size={18} color="#6A45C8" />} title="Customer" indent>
+          <Section tone="lilac" icon={<Ionicons name="people-outline" size={18} color={t.tone.violet.fg} />} title="Customer" indent>
             <Touchable onPress={() => setPickingCustomer(true)} accessibilityRole="button" style={st.input}>
               {customer ? (
                 <>
@@ -300,20 +301,20 @@ export default function BookingFormScreen() {
                 </>
               ) : (
                 <>
-                  <Ionicons name="person-outline" size={16} color={BLUE} />
+                  <Ionicons name="person-outline" size={16} color={t.G.blue} />
                   <Text style={[st.customerName, { flex: 1 }]}>Select or add customer</Text>
                 </>
               )}
-              <Ionicons name="chevron-forward" size={15} color={INK} />
+              <Ionicons name="chevron-forward" size={15} color={t.G.ink} />
             </Touchable>
           </Section>
 
           {/* Event details */}
-          <Section tone="blue" icon={<Ionicons name="document-text-outline" size={18} color={BLUE} />} title="Event Details" indent>
+          <Section tone="blue" icon={<Ionicons name="document-text-outline" size={18} color={t.G.blue} />} title="Event Details" indent>
             <View style={{ gap: 9 }}>
               <View style={{ gap: 5 }}>
                 <Text style={st.label}>
-                  Event type <Text style={{ color: C.danger }}>*</Text>
+                  Event type <Text style={{ color: t.C.danger }}>*</Text>
                 </Text>
                 <Touchable
                   onPress={() => setPickingType((v) => !v)}
@@ -322,35 +323,35 @@ export default function BookingFormScreen() {
                   accessibilityState={{ expanded: pickingType }}
                   style={[st.input, pickingType && st.inputFocus]}>
                   <MaterialCommunityIcons
-                    name={eventType ? (EVENT_META[eventType] ?? EVENT_FALLBACK).icon : 'ring'}
+                    name={eventType ? eventMeta(t, eventType).icon : 'ring'}
                     size={17}
-                    color={BLUE}
+                    color={t.G.blue}
                   />
                   <Text style={st.selectText} numberOfLines={1}>
                     {eventType || 'Select event type'}
                   </Text>
-                  <Ionicons name={pickingType ? 'chevron-up' : 'chevron-down'} size={15} color={INK} />
+                  <Ionicons name={pickingType ? 'chevron-up' : 'chevron-down'} size={15} color={t.G.ink} />
                 </Touchable>
                 {pickingType ? (
                   <View style={st.menu}>
-                    {store.eventTypes.map((t) => {
-                      const m = EVENT_META[t] ?? EVENT_FALLBACK;
-                      const on = eventType === t;
+                    {store.eventTypes.map((type) => {
+                      const m = eventMeta(t, type);
+                      const on = eventType === type;
                       return (
                         <Touchable
-                          key={t}
+                          key={type}
                           onPress={() => {
-                            setEventType(t);
+                            setEventType(type);
                             setPickingType(false);
                           }}
                           accessibilityRole="radio"
                           accessibilityState={{ selected: on }}
-                          style={[st.menuItem, on && { backgroundColor: 'rgba(47, 99, 192, 0.08)' }]}>
+                          style={[st.menuItem, on && { backgroundColor: t.G.soft }]}>
                           <View style={[st.typeIcon, { backgroundColor: m.bg }]}>
                             <MaterialCommunityIcons name={m.icon} size={14} color={m.fg} />
                           </View>
-                          <Text style={[st.menuText, on && { fontFamily: F.semibold, color: BLUE }]}>{t}</Text>
-                          {on ? <Ionicons name="checkmark" size={16} color={BLUE} /> : null}
+                          <Text style={[st.menuText, on && { fontFamily: F.semibold, color: t.G.blue }]}>{type}</Text>
+                          {on ? <Ionicons name="checkmark" size={16} color={t.G.blue} /> : null}
                         </Touchable>
                       );
                     })}
@@ -361,8 +362,8 @@ export default function BookingFormScreen() {
                       }}
                       accessibilityRole="button"
                       style={[st.menuItem, st.menuAdd]}>
-                      <Ionicons name="add" size={16} color={BLUE} />
-                      <Text style={[st.menuText, { fontFamily: F.semibold, color: BLUE }]}>Add new event type</Text>
+                      <Ionicons name="add" size={16} color={t.G.blue} />
+                      <Text style={[st.menuText, { fontFamily: F.semibold, color: t.G.blue }]}>Add new event type</Text>
                     </Touchable>
                   </View>
                 ) : null}
@@ -381,15 +382,15 @@ export default function BookingFormScreen() {
                   />
                   <View style={{ flexDirection: 'row', gap: 10 }}>
                     <Touchable onPress={() => setNewType(null)} accessibilityRole="button" style={[st.formBtn, st.formBtnGhost]}>
-                      <Text style={[st.formBtnText, { color: BLUE }]}>Cancel</Text>
+                      <Text style={[st.formBtnText, { color: t.G.blue }]}>Cancel</Text>
                     </Touchable>
                     <Touchable
                       onPress={addType}
                       disabled={!newType.trim()}
                       accessibilityRole="button"
                       style={[st.formBtn, st.formBtnOn]}>
-                      <GradientFill from="#4F86E6" to="#1C48B0" radius={9} />
-                      <Text style={[st.formBtnText, { color: '#FFFFFF' }]}>Add</Text>
+                      <GradientFill from={t.G.gradFrom} to={t.G.gradTo} radius={9} />
+                      <Text style={[st.formBtnText, { color: t.G.onBlue }]}>Add</Text>
                     </Touchable>
                   </View>
                 </View>
@@ -413,7 +414,7 @@ export default function BookingFormScreen() {
             <Sheen radius={16} strength={0.45} height="25%" />
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <View style={{ flex: 1, gap: 8 }}>
-                <SectionHead tone="mint" icon={<MaterialCommunityIcons name="currency-inr" size={18} color="#1E8A80" />} title="Price" rule />
+                <SectionHead tone="mint" icon={<MaterialCommunityIcons name="currency-inr" size={18} color={t.tone.mint.fg} />} title="Price" rule />
                 {suggested ? (
                   <Touchable
                     onPress={() => {
@@ -464,7 +465,7 @@ export default function BookingFormScreen() {
           {/* Advance */}
           <View style={[st.card, { gap: 10 }]}>
             <Sheen radius={16} strength={0.45} height="40%" />
-            <SectionHead tone="sun" icon={<MaterialCommunityIcons name="hand-coin-outline" size={18} color="#C07A12" />} title="Advance (Optional)" rule />
+            <SectionHead tone="sun" icon={<MaterialCommunityIcons name="hand-coin-outline" size={18} color={t.tone.sand.fg} />} title="Advance (Optional)" rule />
             {editing ? (
               <Text style={st.hint}>
                 {inr(alreadyPaid)} already received. Record further payments from the booking details screen.
@@ -485,7 +486,7 @@ export default function BookingFormScreen() {
           {/* Booking status */}
           <View style={[st.card, { gap: 10 }]}>
             <Sheen radius={16} strength={0.45} height="40%" />
-            <SectionHead tone="rose" icon={<Ionicons name="bookmark-outline" size={17} color="#C2334F" />} title="Booking Status" rule />
+            <SectionHead tone="rose" icon={<Ionicons name="bookmark-outline" size={17} color={t.tone.rose.fg} />} title="Booking Status" rule />
             <View style={st.segment}>
               {STATUS_OPTIONS.map((o, i) => {
                 const on = status === o.key;
@@ -497,10 +498,10 @@ export default function BookingFormScreen() {
                       accessibilityRole="radio"
                       accessibilityState={{ selected: on }}
                       style={[st.segItem, on && st.segOn]}>
-                      {on ? <GradientFill from="#4F86E6" to="#1C48B0" radius={9} horizontal /> : null}
+                      {on ? <GradientFill from={t.G.gradFrom} to={t.G.gradTo} radius={9} horizontal /> : null}
                       {on ? <Sheen radius={9} strength={0.4} height="50%" /> : null}
-                      <Ionicons name={o.icon} size={15} color={on ? '#FFFFFF' : INK} />
-                      <Text style={[st.segText, on && { color: '#FFFFFF', fontFamily: F.semibold }]}>{o.label}</Text>
+                      <Ionicons name={o.icon} size={15} color={on ? t.G.onBlue : t.G.ink} />
+                      <Text style={[st.segText, on && { color: t.G.onBlue, fontFamily: F.semibold }]}>{o.label}</Text>
                     </Touchable>
                   </View>
                 );
@@ -511,7 +512,7 @@ export default function BookingFormScreen() {
 
         <GlassCta
           title={editing ? 'Save Changes' : 'Create Booking'}
-          icon={<MaterialCommunityIcons name="calendar-check-outline" size={20} color="#FFFFFF" />}
+          icon={<MaterialCommunityIcons name="calendar-check-outline" size={20} color={t.G.onBlue} />}
           onPress={save}
           disabled={saving}
         />
@@ -523,12 +524,12 @@ export default function BookingFormScreen() {
         onClose={() => setPickingDate(false)}
         header={
           <>
-            <GlossTile from="#FFFFFF" to="#E3ECFA" radius={12} style={st.sheetTile}>
-              <Ionicons name="calendar-clear-outline" size={21} color={BLUE} />
+            <GlossTile from={t.tone.blue.from} to={t.tone.blue.to} radius={12} style={st.sheetTile}>
+              <Ionicons name="calendar-clear-outline" size={21} color={t.G.blue} />
             </GlossTile>
             <View style={{ flex: 1 }}>
               <Text style={st.sheetTitle}>
-                Select <Text style={{ color: BLUE }}>event date</Text>
+                Select <Text style={{ color: t.G.blue }}>event date</Text>
               </Text>
               <Text style={st.sheetSub}>Fully booked and blocked days can&apos;t be selected.</Text>
             </View>
@@ -589,13 +590,13 @@ export default function BookingFormScreen() {
               style={[st.pickRow, customerId === c.id && st.pickRowOn]}>
               <Avatar name={c.name} size={40} />
               <View style={{ flex: 1 }}>
-                <Text style={T.cardTitle}>{c.name}</Text>
-                <Text style={T.secondary}>{c.phone || 'No phone'}</Text>
+                <Text style={t.T.cardTitle}>{c.name}</Text>
+                <Text style={t.T.secondary}>{c.phone || 'No phone'}</Text>
               </View>
               <Ionicons
                 name={customerId === c.id ? 'checkmark-circle' : 'ellipse-outline'}
                 size={20}
-                color={customerId === c.id ? C.primary : C.borderStrong}
+                color={customerId === c.id ? t.C.primary : t.C.borderStrong}
               />
             </Touchable>
           ))
@@ -608,22 +609,27 @@ export default function BookingFormScreen() {
 
 /** Glossy pastel square behind a section icon. */
 function Tile({ icon, tone }: { icon: ReactNode; tone: Tone }) {
+  const t = useTheme();
+  const st = useSt();
+  const g = t.tone[TILE[tone]];
   return (
-    <GlossTile from={TILE[tone][0]} to={TILE[tone][1]} radius={10} style={st.tile}>
+    <GlossTile from={g.from} to={g.to} radius={10} style={st.tile}>
       {icon}
     </GlossTile>
   );
 }
 
 function SectionHead({ icon, tone, title, rule }: { icon: ReactNode; tone: Tone; title: string; rule?: boolean }) {
+  const t = useTheme();
+  const st = useSt();
   return (
     <View style={st.head}>
       <Tile icon={icon} tone={tone} />
       <Text style={st.overline}>{title}</Text>
       {rule ? (
         <Svg width={56} height={8} viewBox="0 0 56 8" pointerEvents="none">
-          <Path d="M0 4H48" stroke={BLUE} strokeWidth={1} strokeOpacity={0.85} />
-          <Path d="M51.5 1L54.5 4L51.5 7L48.5 4Z" stroke={BLUE} strokeWidth={1} fill="#FFFFFF" />
+          <Path d="M0 4H48" stroke={t.G.blue} strokeWidth={1} strokeOpacity={0.85} />
+          <Path d="M51.5 1L54.5 4L51.5 7L48.5 4Z" stroke={t.G.blue} strokeWidth={1} fill={t.surface} />
         </Svg>
       ) : null}
     </View>
@@ -644,6 +650,7 @@ function Section({
   indent?: boolean;
   children: ReactNode;
 }) {
+  const st = useSt();
   return (
     <View style={[st.card, { gap: indent ? 4 : 10 }]}>
       <Sheen radius={16} strength={0.45} height="30%" />
@@ -661,15 +668,17 @@ function Field({
   multiline,
   ...props
 }: TextInputProps & { label: string; icon?: IonName; prefix?: string; error?: string }) {
+  const t = useTheme();
+  const st = useSt();
   const [focus, setFocus] = useState(false);
   return (
     <View style={{ gap: 5 }}>
       <Text style={st.label}>{label}</Text>
-      <View style={[st.input, focus && st.inputFocus, !!error && { borderColor: C.danger }]}>
-        {icon ? <Ionicons name={icon} size={16} color={BLUE} /> : null}
+      <View style={[st.input, focus && st.inputFocus, !!error && { borderColor: t.C.danger }]}>
+        {icon ? <Ionicons name={icon} size={16} color={t.G.blue} /> : null}
         {prefix ? <Text style={st.prefix}>{prefix}</Text> : null}
         <TextInput
-          placeholderTextColor="#8A90A2"
+          placeholderTextColor={t.G.placeholder}
           multiline={multiline}
           onFocus={() => setFocus(true)}
           onBlur={() => setFocus(false)}
@@ -677,146 +686,149 @@ function Field({
           {...props}
         />
       </View>
-      {error ? <Text style={[T.caption, { color: C.danger }]}>{error}</Text> : null}
+      {error ? <Text style={[t.T.caption, { color: t.C.danger }]}>{error}</Text> : null}
     </View>
   );
 }
 
-const st = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#E6EEF9' },
-  body: { paddingHorizontal: 18, paddingTop: 16, gap: 11, paddingBottom: 16 },
-  card: { ...glassSurface('rgba(244, 248, 255, 0.5)', 16), padding: 10 },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 11 },
-  tile: { width: 36, height: 36 },
-  sheetTile: { width: 42, height: 42, alignSelf: 'flex-start', marginTop: 2 },
-  overline: {
-    fontFamily: F.semibold,
-    fontSize: 10,
-    lineHeight: 14,
-    letterSpacing: 1.3,
-    textTransform: 'uppercase',
-    color: '#4A5470',
-  },
-  label: { fontFamily: F.medium, fontSize: 12, lineHeight: 16, color: INK },
-  hint: { fontFamily: F.regular, fontSize: 11, lineHeight: 15, color: MUTED },
+const useSt = makeStyles((t) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.backgroundAlt },
+    body: { paddingHorizontal: 18, paddingTop: 16, gap: 11, paddingBottom: 16 },
+    card: { ...glassSurface(t, t.frost(0.5), 16), padding: 10 },
+    head: { flexDirection: 'row', alignItems: 'center', gap: 11 },
+    tile: { width: 36, height: 36 },
+    sheetTile: { width: 42, height: 42, alignSelf: 'flex-start', marginTop: 2 },
+    overline: {
+      fontFamily: F.medium,
+      fontSize: 10.5,
+      lineHeight: 14,
+      letterSpacing: 0.9,
+      textTransform: 'uppercase',
+      color: t.G.navy,
+    },
+    label: { fontFamily: F.medium, fontSize: 12, lineHeight: 16, color: t.G.ink },
+    hint: { fontFamily: F.regular, fontSize: 11, lineHeight: 15, color: t.G.muted },
 
-  dateCard: { flexDirection: 'row', alignItems: 'center', gap: 11 },
-  dateText: { fontFamily: F.pageSerifBold, fontSize: 16.5, lineHeight: 21, color: INK },
-  outlineBtn: {
-    ...glassSurface('rgba(255, 255, 255, 0.85)', 10, 'rgba(31, 58, 112, 0.08)'),
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    height: 32,
-    paddingHorizontal: 10,
-    borderColor: 'rgba(47, 99, 192, 0.55)',
-    borderWidth: 1,
-  },
-  outlineBtnText: { fontFamily: F.medium, fontSize: 11.5, color: BLUE },
+    dateCard: { flexDirection: 'row', alignItems: 'center', gap: 11 },
+    dateText: { fontFamily: F.semibold, fontSize: 15.5, lineHeight: 20, letterSpacing: -0.2, color: t.G.ink },
+    outlineBtn: {
+      ...glassSurface(t, t.frost(0.85), 10),
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      height: 32,
+      paddingHorizontal: 10,
+      borderColor: t.G.focusBorder,
+      borderWidth: 1,
+    },
+    outlineBtnText: { fontFamily: F.medium, fontSize: 11.5, color: t.G.blue },
 
-  slotGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  slot: {
-    ...glassSurface('rgba(255, 255, 255, 0.58)', 12, 'rgba(31, 58, 112, 0.05)'),
-    width: '48%',
-    flexGrow: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-    height: 48,
-    paddingHorizontal: 6,
-  },
-  slotOn: {
-    borderColor: 'rgba(79, 134, 230, 0.9)',
-    boxShadow:
-      'inset 0px 1px 0px rgba(255, 255, 255, 1), 0px 0px 0px 1px rgba(79, 134, 230, 0.25), 0px 0px 12px rgba(79, 134, 230, 0.4), 0px 6px 14px rgba(31, 58, 112, 0.1)',
-  },
-  slotIcon: { width: 34, height: 34 },
-  slotTitle: { fontFamily: F.medium, fontSize: 12, lineHeight: 16, color: INK },
-  slotTime: { fontFamily: F.regular, fontSize: 10.5, lineHeight: 14, color: MUTED },
-  slotMark: { position: 'absolute', top: 6, right: 7 },
-  radio: { width: 12, height: 12, borderRadius: 6, borderWidth: 1.2, borderColor: '#9AA2B5' },
+    slotGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+    slot: {
+      ...glassSurface(t, t.frost(0.58), 12),
+      width: '48%',
+      flexGrow: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 9,
+      height: 48,
+      paddingHorizontal: 6,
+    },
+    slotOn: {
+      borderColor: t.primary,
+      boxShadow: t.dark
+        ? `inset 0px 1px 0px rgba(255, 255, 255, 0.06), 0px 0px 0px 3px rgba(214, 170, 69, 0.16), 0px 8px 20px ${t.shadow}`
+        : `inset 0px 1px 0px rgba(255, 255, 255, 0.9), 0px 0px 0px 3px rgba(198, 146, 36, 0.12), 0px 6px 14px ${t.shadow}`,
+    },
+    slotIcon: { width: 34, height: 34 },
+    slotTitle: { fontFamily: F.medium, fontSize: 12, lineHeight: 16, color: t.G.ink },
+    slotTime: { fontFamily: F.regular, fontSize: 10.5, lineHeight: 14, color: t.G.muted },
+    slotMark: { position: 'absolute', top: 6, right: 7 },
+    radio: { width: 12, height: 12, borderRadius: 6, borderWidth: 1.2, borderColor: t.textMuted },
 
-  customerName: { fontFamily: F.regular, fontSize: 12.5, color: INK },
-  customerPhone: { fontFamily: F.regular, fontSize: 10.5, color: MUTED },
+    customerName: { fontFamily: F.medium, fontSize: 13, lineHeight: 17, color: t.G.ink },
+    customerPhone: { fontFamily: F.regular, fontSize: 11, lineHeight: 15, color: t.G.muted },
 
-  selectText: { flex: 1, fontFamily: F.regular, fontSize: 12.5, color: INK },
-  typeIcon: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  menu: {
-    ...glassSurface('rgba(255, 255, 255, 0.9)', 10, 'rgba(31, 58, 112, 0.12)'),
-    marginTop: 2,
-    paddingVertical: 3,
-  },
-  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 38, paddingHorizontal: 10 },
-  menuText: { flex: 1, fontFamily: F.regular, fontSize: 12.5, color: INK },
-  menuAdd: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(31, 58, 112, 0.18)', marginTop: 3 },
-  sheetTitle: { fontFamily: F.pageSerifBold, fontSize: 24, lineHeight: 30, letterSpacing: -0.5, color: INK },
-  sheetSub: { fontFamily: F.regular, fontSize: 11.5, lineHeight: 16, color: '#3A4258', marginTop: 1 },
-  formBtn: { flex: 1, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  formBtnGhost: { ...glassSurface('rgba(255, 255, 255, 0.8)', 10), borderColor: 'rgba(47, 99, 192, 0.5)', borderWidth: 1 },
-  formBtnOn: { borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.9)', boxShadow: '0px 0px 10px rgba(80, 130, 225, 0.4)' },
-  formBtnText: { fontFamily: F.semibold, fontSize: 13 },
+    selectText: { flex: 1, fontFamily: F.regular, fontSize: 13, color: t.G.ink },
+    typeIcon: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+    menu: {
+      ...glassSurface(t, t.frost(0.9), 10),
+      marginTop: 2,
+      paddingVertical: 3,
+    },
+    menuItem: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 38, paddingHorizontal: 10 },
+    menuText: { flex: 1, fontFamily: F.regular, fontSize: 13, color: t.G.ink },
+    menuAdd: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.G.rule, marginTop: 3 },
+    sheetTitle: { fontFamily: F.semibold, fontSize: 22, lineHeight: 27, letterSpacing: -0.3, color: t.G.ink },
+    sheetSub: { fontFamily: F.regular, fontSize: 11.5, lineHeight: 16, color: t.G.navy, marginTop: 1 },
+    formBtn: { flex: 1, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+    formBtnGhost: { ...glassSurface(t, t.frost(0.8), 10), borderColor: t.G.focusBorder, borderWidth: 1 },
+    formBtnOn: { borderWidth: 1, borderColor: t.G.buttonBorder, boxShadow: t.G.buttonGlow },
+    formBtnText: { fontFamily: F.semibold, fontSize: 13.5 },
 
-  input: {
-    ...INPUT_GLASS,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    minHeight: 38,
-    paddingHorizontal: 13,
-  },
-  inputFocus: {
-    borderColor: 'rgba(79, 134, 230, 0.85)',
-    boxShadow: 'inset 0px 1px 0px rgba(255, 255, 255, 1), 0px 0px 0px 1px rgba(79, 134, 230, 0.2), 0px 0px 10px rgba(79, 134, 230, 0.35)',
-  },
-  prefix: { fontFamily: F.medium, fontSize: 13, color: MUTED },
-  inputText: { flex: 1, fontFamily: F.regular, fontSize: 12.5, color: INK, paddingVertical: 8, outlineWidth: 0, ...noOutline },
+    /** Frosted input surface shared by fields, the event-type select and the customer picker. */
+    input: {
+      ...glassSurface(t, t.frost(0.62), 10),
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      minHeight: 38,
+      paddingHorizontal: 13,
+    },
+    inputFocus: {
+      borderColor: t.G.focusBorder,
+      boxShadow: t.G.focusGlow,
+    },
+    prefix: { fontFamily: F.medium, fontSize: 13, color: t.G.muted },
+    inputText: { flex: 1, fontFamily: F.regular, fontSize: 13.5, color: t.G.ink, paddingVertical: 8, outlineWidth: 0, ...noOutline },
 
-  suggestRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 4 },
-  suggestLabel: { fontFamily: F.medium, fontSize: 11.5, color: BLUE },
-  suggestAmt: { fontFamily: F.bold, fontSize: 13.5, color: BLUE },
-  suggestCat: { fontFamily: F.medium, fontSize: 10.5, color: MUTED },
-  totalBox: {
-    ...glassSurface('rgba(236, 243, 254, 0.8)', 12, 'rgba(31, 58, 112, 0.08)'),
-    minWidth: 96,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  totalAmt: { fontFamily: F.bold, fontSize: 18, lineHeight: 24, color: '#1F3F92', fontVariant: ['lining-nums'] },
-  totalLabel: { fontFamily: F.regular, fontSize: 10, color: MUTED },
-  gstRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: -2 },
-  gstText: { fontFamily: F.regular, fontSize: 11.5, color: INK },
-  gstAmt: { fontFamily: F.bold, fontSize: 13.5, color: '#1F3F92', fontVariant: ['lining-nums'] },
+    suggestRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 4 },
+    suggestLabel: { fontFamily: F.medium, fontSize: 11.5, color: t.G.blue },
+    suggestAmt: { fontFamily: F.semibold, fontSize: 13.5, color: t.G.blue },
+    suggestCat: { fontFamily: F.medium, fontSize: 10.5, color: t.G.muted },
+    totalBox: {
+      ...glassSurface(t, t.tint(0.8), 12),
+      minWidth: 96,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+    },
+    totalAmt: { fontFamily: F.semibold, fontSize: 18, lineHeight: 23, letterSpacing: -0.2, color: t.G.deep, fontVariant: ['lining-nums'] },
+    totalLabel: { fontFamily: F.regular, fontSize: 10, color: t.G.muted },
+    gstRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: -2 },
+    gstText: { fontFamily: F.regular, fontSize: 11.5, color: t.G.ink },
+    gstAmt: { fontFamily: F.semibold, fontSize: 13.5, color: t.G.deep, fontVariant: ['lining-nums'] },
 
-  segment: { ...glassSurface('rgba(255, 255, 255, 0.5)', 12, 'rgba(31, 58, 112, 0.04)'), flexDirection: 'row', padding: 2 },
-  segItem: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    minHeight: 32,
-    borderRadius: 10,
-  },
-  segOn: {
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.95)',
-    boxShadow:
-      'inset 0px 1px 0px rgba(255, 255, 255, 0.5), 0px 0px 0px 1px rgba(95, 140, 220, 0.35), 0px 0px 10px rgba(70, 125, 230, 0.5), 0px 4px 10px rgba(28, 72, 176, 0.25)',
-  },
-  segSep: { width: StyleSheet.hairlineWidth, marginVertical: 9, backgroundColor: 'rgba(31, 58, 112, 0.25)' },
-  segText: { fontFamily: F.regular, fontSize: 11.5, color: INK },
+    segment: { ...glassSurface(t, t.frost(0.5), 12), flexDirection: 'row', padding: 2 },
+    segItem: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 5,
+      minHeight: 32,
+      borderRadius: 10,
+    },
+    segOn: {
+      borderWidth: 1,
+      borderColor: t.G.buttonBorder,
+      boxShadow: t.G.buttonGlow,
+    },
+    segSep: { width: StyleSheet.hairlineWidth, marginVertical: 9, backgroundColor: t.G.rule },
+    segText: { fontFamily: F.regular, fontSize: 11.5, color: t.G.ink },
 
-  pickRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 12,
-    borderRadius: radius.md,
-    borderWidth: 1.2,
-    borderColor: C.border,
-    backgroundColor: C.surface,
-  },
-  pickRowOn: { borderColor: C.primary, backgroundColor: C.primarySoft },
-});
+    pickRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      padding: 12,
+      borderRadius: radius.md,
+      borderWidth: 1.2,
+      borderColor: t.C.border,
+      backgroundColor: t.C.surface,
+    },
+    pickRowOn: { borderColor: t.C.primary, backgroundColor: t.C.primarySoft },
+  }),
+);

@@ -13,7 +13,8 @@ import { BottomSheet, ConfirmDialog, useToast } from '@/components/overlays';
 import { ScrollFade, Touchable, useSmoothScroll } from '@/components/primitives';
 import { fmtFull, fmtLong, MONTHS, parseISO, toISO, todayISO } from '@/lib/format';
 import { DATE_TYPE_META, useStore, type DateType, type ImportantDate } from '@/lib/store';
-import { C, F, noOutline, radius, T } from '@/lib/theme';
+import { F, noOutline, radius, type Theme, type Tone } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/lib/theme-context';
 
 type Filter = 'all' | DateType;
 const TYPES = Object.keys(DATE_TYPE_META) as DateType[];
@@ -27,12 +28,12 @@ const TYPE_ICON: Partial<Record<DateType, MciName>> = {
   holiday: 'calendar-blank-outline',
 };
 /** Icon / dot colour per type in the add-date picker. */
-const PICK_COLOR: Record<DateType, string> = {
-  muhurtham: '#D9A21B',
-  valarpirai: '#7B3FF0',
-  special: '#12978A',
-  holiday: '#D9303E',
-};
+const pickColor = (t: Theme): Record<DateType, string> => ({
+  muhurtham: t.tone.sand.fg,
+  valarpirai: t.tone.violet.fg,
+  special: t.D.special.fg,
+  holiday: t.C.danger,
+});
 
 /** Keeps only digits and inserts the dashes of YYYY-MM-DD as the user types. */
 function maskISO(v: string) {
@@ -44,16 +45,23 @@ const isValidISO = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && toISO(parseIS
 
 /** Labelled input row: icon cell on the left, input filling the rest. */
 function Field({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
+  const t = useTheme();
+  const st = useSt();
   return (
     <View style={{ gap: 6 }}>
       <Text style={st.label}>{label}</Text>
-      <View style={[st.field, !!error && { borderColor: C.danger }]}>{children}</View>
-      {error ? <Text style={[T.caption, { color: C.danger }]}>{error}</Text> : null}
+      <View style={[st.field, !!error && { borderColor: t.C.danger }]}>{children}</View>
+      {error ? <Text style={[t.T.caption, { color: t.C.danger }]}>{error}</Text> : null}
     </View>
   );
 }
 
 export default function ImportantDatesScreen() {
+  const t = useTheme();
+  const st = useSt();
+  const TYPE_STYLE = typeStyle(t);
+  const PICK_COLOR = pickColor(t);
+  const { navy: NAVY, blue: ROYAL, blue: BRIGHT } = t.G;
   const { importantDates, addImportantDate, removeImportantDate, typesFor } = useStore();
   const toast = useToast();
   const [year, setYear] = useState(parseISO(todayISO()).getFullYear());
@@ -105,13 +113,13 @@ export default function ImportantDatesScreen() {
 
       <View style={st.top}>
         {/* Year switcher */}
-        <View style={[st.yearCard, glassSurface('rgba(255, 255, 255, 0.5)', 16)]}>
+        <View style={[st.yearCard, glassSurface(t, t.frost(0.5), 16)]}>
           <Sheen radius={16} strength={0.55} />
           <Touchable
             onPress={() => setYear((y) => y - 1)}
             accessibilityRole="button"
             accessibilityLabel="Previous year"
-            style={[st.center, glassSurface('rgba(255, 255, 255, 0.7)', 15), st.yearBtn]}>
+            style={[st.center, glassSurface(t, t.frost(0.7), 15), st.yearBtn]}>
             <Ionicons name="chevron-back" size={17} color={NAVY} />
           </Touchable>
           <View style={st.yearMid}>
@@ -124,7 +132,7 @@ export default function ImportantDatesScreen() {
             onPress={() => setYear((y) => y + 1)}
             accessibilityRole="button"
             accessibilityLabel="Next year"
-            style={[st.center, glassSurface('rgba(255, 255, 255, 0.7)', 15), st.yearBtn]}>
+            style={[st.center, glassSurface(t, t.frost(0.7), 15), st.yearBtn]}>
             <Ionicons name="chevron-forward" size={17} color={NAVY} />
           </Touchable>
         </View>
@@ -139,8 +147,8 @@ export default function ImportantDatesScreen() {
                 onPress={() => setFilter(f)}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: on }}
-                style={[st.filter, on ? st.filterOn : glassSurface('rgba(255, 255, 255, 0.55)', 14)]}>
-                {on ? <GradientFill from="#EEF4FE" to="#D3E3FA" radius={14} fromOpacity={0.95} toOpacity={0.9} /> : null}
+                style={[st.filter, on ? st.filterOn : glassSurface(t, t.frost(0.55), 14)]}>
+                {on ? <GradientFill from={t.tone.blue.from} to={t.tone.blue.to} radius={14} fromOpacity={0.95} toOpacity={0.9} /> : null}
                 <Sheen radius={14} strength={0.55} height="50%" />
                 {f === 'all' ? (
                   <MaterialCommunityIcons name="view-grid-outline" size={16} color={on ? ROYAL : NAVY} />
@@ -169,7 +177,7 @@ export default function ImportantDatesScreen() {
         contentContainerStyle={st.list}
         ListEmptyComponent={
           <View style={st.empty}>
-            <View style={[st.emptyOrb, glassSurface('rgba(255, 255, 255, 0.55)', 32)]}>
+            <View style={[st.emptyOrb, glassSurface(t, t.frost(0.55), 32)]}>
               <Sheen radius={32} strength={0.6} height="50%" />
               <Ionicons name="star-outline" size={26} color={NAVY} />
             </View>
@@ -188,11 +196,11 @@ export default function ImportantDatesScreen() {
           const d = parseISO(item.date);
           const ts = TYPE_STYLE[item.type];
           // Valarpirai tiles alternate blue and lilac so long runs stay easy to scan.
-          const tile = item.type === 'valarpirai' && index % 2 === 0 ? TILE.blue : ts.tile;
+          const tile = item.type === 'valarpirai' && index % 2 === 0 ? t.tone.blue : ts.tile;
           return (
-            <View style={[st.row, glassSurface('rgba(255, 255, 255, 0.58)', 12, 'rgba(31, 58, 112, 0.05)')]}>
+            <View style={[st.row, glassSurface(t, t.frost(0.58), 12)]}>
               <Sheen radius={12} strength={0.45} height="45%" />
-              <GlossTile from={tile[0]} to={tile[1]} radius={9} style={st.tile}>
+              <GlossTile from={tile.from} to={tile.to} radius={9} style={st.tile}>
                 <Text style={st.tileDay}>{String(d.getDate()).padStart(2, '0')}</Text>
                 <Text style={st.tileMonth}>{MONTHS[d.getMonth()].slice(0, 3).toUpperCase()}</Text>
               </GlossTile>
@@ -215,8 +223,8 @@ export default function ImportantDatesScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={`Delete ${fmtLong(item.date)}`}
                 hitSlop={6}>
-                <GlossTile from="#FCEEF2" to="#F6DCE4" radius={8} style={st.trash}>
-                  <MaterialCommunityIcons name="trash-can-outline" size={18} color="#A3213F" />
+                <GlossTile from={t.tone.rose.from} to={t.tone.rose.to} radius={8} style={st.trash}>
+                  <MaterialCommunityIcons name="trash-can-outline" size={18} color={t.C.danger} />
                 </GlossTile>
               </Touchable>
             </View>
@@ -227,7 +235,7 @@ export default function ImportantDatesScreen() {
 
       <GlassCta
         title="Add Date"
-        icon={<Ionicons name="add" size={20} color="#FFFFFF" />}
+        icon={<Ionicons name="add" size={20} color={t.G.onBlue} />}
         onPress={() => {
           setDateText(todayISO());
           setShowCal(false);
@@ -240,11 +248,11 @@ export default function ImportantDatesScreen() {
       <BottomSheet
         visible={adding}
         onClose={() => setAdding(false)}
-        backdropColor="rgba(19, 29, 56, 0.06)"
+        backdropColor={t.dark ? 'rgba(0, 0, 0, 0.4)' : 'rgba(30, 30, 30, 0.06)'}
         header={
           <View style={st.sheetHead}>
-            <Image source={SHEET_FLORAL} tintColor="#9DB6E6" style={st.sheetFloral} contentFit="contain" pointerEvents="none" />
-            <View style={[st.sheetIcon, glassSurface('rgba(255, 255, 255, 0.6)', 14)]}>
+            <Image source={SHEET_FLORAL} tintColor={t.lightBlue} style={st.sheetFloral} contentFit="contain" pointerEvents="none" />
+            <View style={[st.sheetIcon, glassSurface(t, t.frost(0.6), 14)]}>
               <Sheen radius={14} strength={0.6} height="50%" />
               <MaterialCommunityIcons name="calendar-star" size={26} color={ROYAL} />
             </View>
@@ -267,20 +275,20 @@ export default function ImportantDatesScreen() {
             onPress={save}
           />
         }>
-        <View style={[st.panel, glassSurface('rgba(255, 255, 255, 0.32)', 18)]}>
+        <View style={[st.panel, glassSurface(t, t.frost(0.32), 18)]}>
         <Field label="Date (YYYY-MM-DD)" error={dateError}>
           <Touchable
             onPress={openCalendar}
             accessibilityRole="button"
             accessibilityLabel={showCal ? 'Hide calendar' : 'Pick from calendar'}
-            style={[st.fieldIcon, showCal && { backgroundColor: 'rgba(190, 212, 248, 0.8)' }]}>
+            style={[st.fieldIcon, showCal && { backgroundColor: t.lightBlue }]}>
             <MaterialCommunityIcons name="calendar-blank-outline" size={19} color={ROYAL} />
           </Touchable>
           <TextInput
             value={dateText}
             onChangeText={(v) => setDateText(maskISO(v))}
             placeholder="YYYY-MM-DD"
-            placeholderTextColor={C.textMuted}
+            placeholderTextColor={t.G.placeholder}
             keyboardType="number-pad"
             maxLength={10}
             accessibilityLabel="Date"
@@ -306,24 +314,24 @@ export default function ImportantDatesScreen() {
         <View style={{ gap: 6 }}>
           <Text style={st.label}>Date type</Text>
           <View style={st.types}>
-            {TYPES.map((t) => {
-              const on = pickType === t;
-              const icon = TYPE_ICON[t];
+            {TYPES.map((ty) => {
+              const on = pickType === ty;
+              const icon = TYPE_ICON[ty];
               return (
                 <Touchable
-                  key={t}
-                  onPress={() => setPickType(t)}
+                  key={ty}
+                  onPress={() => setPickType(ty)}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: on }}
-                  style={[st.type, on ? st.typeOn : glassSurface('rgba(255, 255, 255, 0.6)', 12)]}>
-                  {on ? <GradientFill from="#FFF8E6" to="#F5E3B8" radius={12} /> : null}
+                  style={[st.type, on ? st.typeOn : glassSurface(t, t.frost(0.6), 12)]}>
+                  {on ? <GradientFill from={t.tone.sand.from} to={t.tone.sand.to} radius={12} /> : null}
                   <Sheen radius={12} strength={0.55} height="50%" />
                   {icon ? (
-                    <MaterialCommunityIcons name={icon} size={19} color={PICK_COLOR[t]} />
+                    <MaterialCommunityIcons name={icon} size={19} color={PICK_COLOR[ty]} />
                   ) : (
-                    <View style={[st.typeDot, { backgroundColor: PICK_COLOR[t] }]} />
+                    <View style={[st.typeDot, { backgroundColor: PICK_COLOR[ty] }]} />
                   )}
-                  <Text style={[st.typeLabel, on && st.typeLabelOn]}>{DATE_TYPE_META[t].label}</Text>
+                  <Text style={[st.typeLabel, on && st.typeLabelOn]}>{DATE_TYPE_META[ty].label}</Text>
                 </Touchable>
               );
             })}
@@ -338,7 +346,7 @@ export default function ImportantDatesScreen() {
             value={title}
             onChangeText={setTitle}
             placeholder="Thai Poosam, Pongal..."
-            placeholderTextColor={C.textMuted}
+            placeholderTextColor={t.G.placeholder}
             maxLength={60}
             returnKeyType="done"
             onSubmitEditing={save}
@@ -350,8 +358,8 @@ export default function ImportantDatesScreen() {
 
         {alreadyExists ? (
           <View style={st.warn}>
-            <Ionicons name="information-circle-outline" size={16} color={C.warning} />
-            <Text style={[T.caption, { color: C.warning }]}>This date is already marked {DATE_TYPE_META[pickType].label}.</Text>
+            <Ionicons name="information-circle-outline" size={16} color={t.C.warning} />
+            <Text style={[t.T.caption, { color: t.C.warning }]}>This date is already marked {DATE_TYPE_META[pickType].label}.</Text>
           </View>
         ) : null}
       </BottomSheet>
@@ -373,40 +381,25 @@ export default function ImportantDatesScreen() {
   );
 }
 
-/** Blue glass palette shared with the tab screens. */
-const INK = '#131D38';
-const NAVY = '#1F3A70';
-const ROYAL = '#2458C8';
-const BRIGHT = '#2A66DD';
-const MUTED = '#4F5A76';
-const FILIGREE = '#8FA3C8';
-
-/** Pastel gradients for the day tiles. */
-const TILE = {
-  blue: ['#EEF5FE', '#D5E5FB'],
-  lilac: ['#F5F0FD', '#E3D9F8'],
-  cream: ['#FEF8EA', '#F5E7C6'],
-  mint: ['#EAF8F4', '#CDEEE5'],
-  rose: ['#FDEFF3', '#F7D7E0'],
-} as const;
-
 /** Per-type dot, label and tile colours for the glass list. */
-const TYPE_STYLE: Record<DateType, { dot: string; text: string; tile: readonly [string, string] }> = {
-  muhurtham: { dot: '#B8860B', text: '#9A6B0C', tile: TILE.cream },
-  valarpirai: { dot: '#7650D6', text: '#5E43B4', tile: TILE.lilac },
-  special: { dot: '#12958A', text: '#10766E', tile: TILE.mint },
-  holiday: { dot: '#C63B5C', text: '#A8354F', tile: TILE.rose },
-};
+const typeStyle = (t: Theme): Record<DateType, { dot: string; text: string; tile: Tone }> => ({
+  muhurtham: { dot: t.tone.sand.fg, text: t.D.muhurtham.fg, tile: t.tone.sand },
+  valarpirai: { dot: t.tone.violet.fg, text: t.D.valarpirai.fg, tile: t.tone.violet },
+  special: { dot: t.D.special.fg, text: t.D.special.fg, tile: t.tone.mint },
+  holiday: { dot: t.tone.rose.fg, text: t.D.holiday.fg, tile: t.tone.rose },
+});
 
 /** Filigree beside the year: hairlines either side of a small knot of loops around a diamond. */
 function Flourish({ flip }: { flip?: boolean }) {
+  const t = useTheme();
+  const FILIGREE = t.dark ? '#6B5A3A' : '#C9B384';
   return (
     <Svg width={62} height={14} viewBox="0 0 62 14" style={flip ? { transform: [{ scaleX: -1 }] } : undefined} pointerEvents="none">
       <Path d="M0 7H21" stroke={FILIGREE} strokeWidth={0.8} strokeOpacity={0.6} />
       <Path d="M41 7H62" stroke={FILIGREE} strokeWidth={0.8} strokeOpacity={0.9} />
       <Path d="M26 7C24 3.5 20.5 3.8 21.5 6.2C22.3 8 24.6 7.4 26 7C24 10.5 20.5 10.2 21.5 7.8" stroke={FILIGREE} strokeWidth={0.8} fill="none" />
       <Path d="M36 7C38 3.5 41.5 3.8 40.5 6.2C39.7 8 37.4 7.4 36 7C38 10.5 41.5 10.2 40.5 7.8" stroke={FILIGREE} strokeWidth={0.8} fill="none" />
-      <Path d="M31 2.2L35.8 7L31 11.8L26.2 7Z" stroke={FILIGREE} strokeWidth={0.9} fill="#FFFFFF" fillOpacity={0.7} />
+      <Path d="M31 2.2L35.8 7L31 11.8L26.2 7Z" stroke={FILIGREE} strokeWidth={0.9} fill={t.highlight} fillOpacity={t.dark ? 0.12 : 0.7} />
       <Circle cx={31} cy={7} r={1.2} fill={FILIGREE} />
     </Svg>
   );
@@ -414,13 +407,14 @@ function Flourish({ flip }: { flip?: boolean }) {
 
 /** Blue hairline after a month label, fading out to the right. */
 function MonthRule() {
+  const t = useTheme();
   const id = 'mr' + useId().replace(/[^a-zA-Z0-9]/g, '');
   return (
     <Svg width={70} height={2} viewBox="0 0 70 2" pointerEvents="none">
       <Defs>
         <LinearGradient id={id} x1="0" y1="0" x2="1" y2="0">
-          <Stop offset="0" stopColor="#4F6FA8" stopOpacity={0.9} />
-          <Stop offset="1" stopColor="#4F6FA8" stopOpacity={0} />
+          <Stop offset="0" stopColor={t.G.blue} stopOpacity={0.9} />
+          <Stop offset="1" stopColor={t.G.blue} stopOpacity={0} />
         </LinearGradient>
       </Defs>
       <Rect width={70} height={1.4} y={0.3} fill={`url(#${id})`} />
@@ -428,106 +422,115 @@ function MonthRule() {
   );
 }
 
-const st = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#E6EEF9' },
-  center: { alignItems: 'center', justifyContent: 'center' },
-  top: { paddingTop: 14, gap: 8 },
-  yearCard: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 18, paddingHorizontal: 8, height: 52 },
-  yearBtn: { width: 34, height: 34 },
-  yearMid: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
-  year: { fontFamily: F.pageSerifBold, fontSize: 21, lineHeight: 26, color: INK, fontVariant: ['lining-nums'] },
-  filters: { gap: 7, paddingHorizontal: 11, paddingVertical: 8 },
-  filter: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, paddingHorizontal: 12, borderRadius: 17 },
-  filterOn: {
-    paddingHorizontal: 15,
-    borderWidth: 1.2,
-    borderColor: 'rgba(150, 185, 240, 0.85)',
-    boxShadow:
-      'inset 0px 1px 0px rgba(255, 255, 255, 0.9), 0px 0px 0px 1px rgba(255, 255, 255, 0.6), 0px 0px 10px rgba(120, 165, 240, 0.45), 0px 3px 8px rgba(31, 63, 146, 0.12)',
-  },
-  filterText: { fontFamily: F.regular, fontSize: 12.5, color: INK },
-  empty: { alignItems: 'center', paddingTop: 70, paddingHorizontal: 24 },
-  emptyOrb: { width: 64, height: 64, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  emptyTitle: { fontFamily: F.pageSerifBold, fontSize: 17.5, lineHeight: 23, color: INK, textAlign: 'center', fontVariant: ['lining-nums'] },
-  emptyMsg: { fontFamily: F.regular, fontSize: 13, lineHeight: 18, color: MUTED, textAlign: 'center', marginTop: 8 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  list: { paddingHorizontal: 18, paddingBottom: 12 },
-  monthRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: 7 },
-  month: { fontFamily: F.semibold, fontSize: 11.5, lineHeight: 16, letterSpacing: 1.2, color: '#4A5470', textTransform: 'uppercase' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 54, paddingLeft: 8, paddingRight: 9 },
-  tile: { width: 58, height: 40 },
-  tileDay: { fontFamily: F.pageSerifBold, fontSize: 16.5, lineHeight: 18, color: INK, fontVariant: ['lining-nums'] },
-  tileMonth: { fontFamily: F.pageSerif, fontSize: 9, lineHeight: 11, letterSpacing: 0.3, color: INK },
-  rowDate: { fontFamily: F.pageSerifBold, fontSize: 14, lineHeight: 18, color: INK, fontVariant: ['lining-nums'] },
-  typeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  typeText: { fontFamily: F.regular, fontSize: 12, lineHeight: 16 },
-  rowTitle: { flexShrink: 1, fontFamily: F.regular, fontSize: 12, color: '#5B6275' },
-  trash: { width: 33, height: 33 },
-  sheetFloral: { position: 'absolute', top: -22, right: 18, width: 110, height: 84, opacity: 0.55 },
-  sheetHead: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 16 },
-  sheetIcon: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center' },
-  sheetTitle: { fontFamily: F.pageSerifBold, fontSize: 21, lineHeight: 27, letterSpacing: -0.3, color: INK },
-  sheetSub: { fontFamily: F.regular, fontSize: 12, lineHeight: 16, color: MUTED, marginTop: 2 },
-  panel: { padding: 12, paddingTop: 14, gap: 12 },
-  label: { fontFamily: F.medium, fontSize: 12.5, color: '#232B45' },
-  field: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 40,
-    borderRadius: 12,
-    borderWidth: 1.2,
-    borderColor: 'rgba(255, 255, 255, 0.95)',
-    backgroundColor: 'rgba(255, 255, 255, 0.55)',
-    overflow: 'hidden',
-    boxShadow: 'inset 0px 1px 0px rgba(255, 255, 255, 1), 0px 2px 8px rgba(31, 58, 112, 0.06)',
-  },
-  fieldIcon: {
-    width: 44,
-    alignSelf: 'stretch',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(214, 226, 246, 0.55)',
-  },
-  fieldInput: {
-    flex: 1,
-    alignSelf: 'stretch',
-    paddingHorizontal: 12,
-    fontFamily: F.regular,
-    fontSize: 14.5,
-    color: INK,
-    fontVariant: ['lining-nums'],
-    ...noOutline,
-  },
-  types: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
-  type: {
-    flexBasis: '46%',
-    flexGrow: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    height: 38,
-    paddingHorizontal: 16,
-  },
-  typeOn: {
-    borderRadius: 12,
-    borderWidth: 1.4,
-    borderColor: '#D8B35A',
-    boxShadow: 'inset 0px 1px 0px rgba(255, 255, 255, 0.9), 0px 0px 8px rgba(216, 179, 90, 0.45), 0px 3px 8px rgba(120, 85, 20, 0.12)',
-  },
-  typeDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    boxShadow: 'inset 0px 1.5px 1px rgba(255, 255, 255, 0.55), inset 0px -2px 3px rgba(0, 0, 0, 0.18), 0px 1px 2px rgba(0, 0, 0, 0.12)',
-  },
-  typeLabel: { fontFamily: F.semibold, fontSize: 13.5, color: '#151C3A' },
-  typeLabelOn: { fontFamily: F.pageSerifBold, color: '#4A2E05' },
-  pickCard: {
-    backgroundColor: C.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: C.border,
-    padding: 8,
-  },
-  warn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-});
+const useSt = makeStyles((t) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: t.background },
+    center: { alignItems: 'center', justifyContent: 'center' },
+    top: { paddingTop: 14, gap: 8 },
+    yearCard: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 18, paddingHorizontal: 8, height: 52 },
+    yearBtn: { width: 34, height: 34 },
+    yearMid: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+    year: { fontFamily: F.semibold, fontSize: 19, lineHeight: 24, letterSpacing: -0.2, color: t.G.ink, fontVariant: ['lining-nums'] },
+    filters: { gap: 7, paddingHorizontal: 11, paddingVertical: 8 },
+    filter: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, paddingHorizontal: 12, borderRadius: 17 },
+    filterOn: {
+      paddingHorizontal: 15,
+      borderWidth: 1.2,
+      borderColor: t.G.focusBorder,
+      boxShadow: t.dark
+        ? `inset 0px 1px 0px rgba(255, 255, 255, 0.06), 0px 8px 20px ${t.shadow}`
+        : 'inset 0px 1px 0px rgba(255, 255, 255, 0.9), 0px 3px 8px rgba(30, 30, 30, 0.08)',
+    },
+    filterText: { fontFamily: F.medium, fontSize: 12.5, color: t.G.ink },
+    empty: { alignItems: 'center', paddingTop: 70, paddingHorizontal: 24 },
+    emptyOrb: { width: 64, height: 64, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+    emptyTitle: { fontFamily: F.semibold, fontSize: 16, lineHeight: 21, color: t.G.ink, textAlign: 'center', fontVariant: ['lining-nums'] },
+    emptyMsg: { fontFamily: F.regular, fontSize: 13, lineHeight: 18, color: t.G.muted, textAlign: 'center', marginTop: 8 },
+    dot: { width: 8, height: 8, borderRadius: 4 },
+    list: { paddingHorizontal: 18, paddingBottom: 12 },
+    monthRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: 7 },
+    month: { fontFamily: F.medium, fontSize: 11, lineHeight: 15, letterSpacing: 0.8, color: t.G.muted, textTransform: 'uppercase' },
+    row: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 54, paddingLeft: 8, paddingRight: 9 },
+    tile: { width: 58, height: 40 },
+    tileDay: { fontFamily: F.semibold, fontSize: 15.5, lineHeight: 18, letterSpacing: -0.2, color: t.G.ink, fontVariant: ['lining-nums'] },
+    tileMonth: { fontFamily: F.medium, fontSize: 9.5, lineHeight: 12, letterSpacing: 0.4, color: t.G.ink },
+    rowDate: { fontFamily: F.semibold, fontSize: 13.5, lineHeight: 18, color: t.G.ink, fontVariant: ['lining-nums'] },
+    typeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    typeText: { fontFamily: F.regular, fontSize: 12, lineHeight: 16 },
+    rowTitle: { flexShrink: 1, fontFamily: F.regular, fontSize: 12, color: t.G.muted },
+    trash: { width: 33, height: 33 },
+    sheetFloral: { position: 'absolute', top: -22, right: 18, width: 110, height: 84, opacity: 0.55 },
+    sheetHead: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 16 },
+    sheetIcon: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center' },
+    sheetTitle: { fontFamily: F.semibold, fontSize: 19, lineHeight: 24, letterSpacing: -0.3, color: t.G.ink },
+    sheetSub: { fontFamily: F.regular, fontSize: 12, lineHeight: 16, color: t.G.muted, marginTop: 2 },
+    panel: { padding: 12, paddingTop: 14, gap: 12 },
+    label: { fontFamily: F.medium, fontSize: 12, color: t.G.ink },
+    field: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      height: 40,
+      borderRadius: 12,
+      borderWidth: 1.2,
+      borderColor: t.glassBorder,
+      backgroundColor: t.frost(0.55),
+      overflow: 'hidden',
+      boxShadow: t.dark
+        ? `inset 0px 1px 0px rgba(255, 255, 255, 0.06), 0px 2px 8px ${t.shadow}`
+        : `inset 0px 1px 0px rgba(255, 255, 255, 0.9), 0px 2px 8px ${t.shadow}`,
+    },
+    fieldIcon: {
+      width: 44,
+      alignSelf: 'stretch',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.tint(0.55),
+    },
+    fieldInput: {
+      flex: 1,
+      alignSelf: 'stretch',
+      paddingHorizontal: 12,
+      fontFamily: F.regular,
+      fontSize: 14,
+      color: t.G.ink,
+      fontVariant: ['lining-nums'],
+      ...noOutline,
+    },
+    types: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
+    type: {
+      flexBasis: '46%',
+      flexGrow: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+      height: 38,
+      paddingHorizontal: 16,
+    },
+    typeOn: {
+      borderRadius: 12,
+      borderWidth: 1.4,
+      borderColor: t.dark ? 'rgba(201, 164, 94, 0.5)' : '#DCC285',
+      boxShadow: t.dark
+        ? `inset 0px 1px 0px rgba(255, 255, 255, 0.06), 0px 8px 20px ${t.shadow}`
+        : 'inset 0px 1px 0px rgba(255, 255, 255, 0.9), 0px 3px 8px rgba(120, 85, 20, 0.08)',
+    },
+    typeDot: {
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      boxShadow: t.dark
+        ? 'inset 0px 1px 0px rgba(255, 255, 255, 0.12)'
+        : 'inset 0px 1px 1px rgba(255, 255, 255, 0.45), inset 0px -1px 2px rgba(0, 0, 0, 0.1), 0px 1px 2px rgba(30, 30, 30, 0.08)',
+    },
+    typeLabel: { fontFamily: F.medium, fontSize: 13, color: t.G.ink },
+    typeLabelOn: { fontFamily: F.semibold, color: t.C.accentText },
+    pickCard: {
+      backgroundColor: t.surface,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: t.C.border,
+      padding: 8,
+    },
+    warn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  }),
+);

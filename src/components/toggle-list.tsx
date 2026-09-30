@@ -1,7 +1,7 @@
 import { StyleSheet, Switch, Text, View } from 'react-native';
 
 import { Card, Divider } from '@/components/primitives';
-import { C, T } from '@/lib/theme';
+import { useTheme } from '@/lib/theme-context';
 
 export type ToggleItem = { key: string; title: string; sub?: string };
 
@@ -14,6 +14,7 @@ export function ToggleList({
   values: Record<string, boolean>;
   onChange: (key: string, v: boolean) => void;
 }) {
+  const { C, T } = useTheme();
   return (
     <Card style={{ padding: 0 }}>
       {items.map((it, i) => (
@@ -27,7 +28,7 @@ export function ToggleList({
               value={!!values[it.key]}
               onValueChange={(v) => onChange(it.key, v)}
               trackColor={{ true: C.primary, false: C.borderStrong }}
-              thumbColor="#fff"
+              thumbColor={C.onPrimary}
             />
           </View>
           {i < items.length - 1 ? <Divider inset={16} /> : null}

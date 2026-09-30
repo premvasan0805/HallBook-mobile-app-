@@ -24,7 +24,7 @@ const MANDALA_RINGS = [
   { count: 32, d: 'M100 8Q103 4 100 0Q97 4 100 8Z' },
 ];
 
-/** Fine-line mandala (lotus rosette) used as a faint decorative accent on burgundy surfaces. */
+/** Fine-line mandala (lotus rosette) used as a faint decorative accent on blue surfaces. */
 export function Mandala({ size, color, opacity = 1 }: { size: number; color: string; opacity?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 200 200" opacity={opacity}>
@@ -76,7 +76,7 @@ export function HeartRule({ width, color }: { width: number; color: string }) {
 }
 
 /**
- * Subtle left-to-right burgundy sheen filling its parent (parent needs `overflow: 'hidden'`).
+ * Subtle left-to-right gradient sheen filling its parent (parent needs `overflow: 'hidden'`).
  * Pass `shape` (an SVG path in `viewBox` units) to fill a custom outline instead of the whole rect.
  */
 export function BrandGradient({
@@ -109,7 +109,7 @@ export function BrandGradient({
   );
 }
 
-/** Gold line-art wedding mandapam (domed pavilion) used as a faint illustration on burgundy panels. */
+/** Gold line-art wedding mandapam (domed pavilion) used as a faint illustration on brand panels. */
 export function Mandapam({ width, color, opacity = 1 }: { width: number; color: string; opacity?: number }) {
   return (
     <Svg width={width} height={width * 0.7} viewBox="0 0 160 112" opacity={opacity}>

@@ -9,8 +9,9 @@ import { Touchable } from '@/components/primitives';
 import { initials, todayISO } from '@/lib/format';
 import { useStore } from '@/lib/store';
 import { appWidth, F } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/lib/theme-context';
 
-/** Burgundy panel with the lotus mandala and mandap scene, with the live text and buttons removed. */
+/** Header panel with the lotus mandala and mandap scene, with the live text and buttons removed. */
 const BG = require('../../assets/images/header/brand-header-card.jpg');
 
 /** Reference artboard the header is laid out against; `k` maps its units to dp. */
@@ -20,6 +21,7 @@ const REF_H = 503;
 const RIM = 16;
 const RADIUS = 104;
 
+/** Wordmark, text and icons sit on the header artwork, so they stay ivory / gold in both themes. */
 const IVORY = '#FFFFFF';
 const GOLD = '#E8BD6C';
 const RIM_GOLD = '#EEC680';
@@ -31,10 +33,11 @@ const BOOK_STOPS = [
 ] as const;
 
 /**
- * Burgundy header shared by the Bookings, Customers and Settings tabs: wordmark and hall switcher on
+ * Blue header shared by the Bookings, Customers and Settings tabs: wordmark and hall switcher on
  * the left, lotus mandala and mandap scene on the right with bell and profile, over a gold bottom rim.
  */
 export function CompactBrandHeader({ topInset, showProfile = true }: { topInset: number; showProfile?: boolean }) {
+  const st = useSt();
   const { hall, bookings } = useStore();
   const { width } = useWindowDimensions();
   const today = todayISO();
@@ -70,7 +73,7 @@ export function CompactBrandHeader({ topInset, showProfile = true }: { topInset:
         <Image source={BG} contentFit="fill" pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: topInset, height: artH }} />
 
         <View style={{ position: 'absolute', left: 0, right: 0, top: topInset, height: artH }}>
-          {/* Wordmark: ivory "Hall", gold-foil "Book" */}
+          {/* Wordmark: ivory "Banyan", gold-foil "Meadows" */}
           <Svg pointerEvents="none" style={StyleSheet.absoluteFill} viewBox={`0 0 ${REF_W} ${REF_H}`}>
             <Defs>
               <LinearGradient id={`${id}-book`} x1="0" y1="0" x2="0" y2="1">
@@ -79,9 +82,9 @@ export function CompactBrandHeader({ topInset, showProfile = true }: { topInset:
                 ))}
               </LinearGradient>
             </Defs>
-            <SvgText x={100} y={254} fontFamily={F.pageSerifBold} fontSize={182} letterSpacing={-2} fill={IVORY}>
-              <TSpan>Hall</TSpan>
-              <TSpan fill={`url(#${id}-book)`}>Book</TSpan>
+            <SvgText x={100} y={250} fontFamily={F.semibold} fontSize={124} letterSpacing={-2.5} fill={IVORY}>
+              <TSpan>Banyan</TSpan>
+              <TSpan dx={30} fill={`url(#${id}-book)`}>Meadows</TSpan>
             </SvgText>
           </Svg>
 
@@ -90,7 +93,7 @@ export function CompactBrandHeader({ topInset, showProfile = true }: { topInset:
             accessibilityLabel="Hall details"
             style={[st.row, { left: u(96), top: u(290), height: u(126), maxWidth: u(1000) }]}>
             <MaterialCommunityIcons name="bank" size={u(142)} color={GOLD} />
-            <Text numberOfLines={1} style={[st.hallName, { marginLeft: u(36), fontSize: u(71), lineHeight: u(86) }]}>
+            <Text numberOfLines={1} style={[st.hallName, { marginLeft: u(36), fontSize: u(66), lineHeight: u(86) }]}>
               {hall.name}
             </Text>
             <Ionicons name="chevron-down" size={u(78)} color={IVORY} style={{ marginLeft: u(30), marginTop: u(6) }} />
@@ -134,7 +137,7 @@ export function CompactBrandHeader({ topInset, showProfile = true }: { topInset:
                   borderWidth: Math.max(u(6), 1.5),
                 },
               ]}>
-              <Text style={[st.avatarText, { fontSize: u(96), lineHeight: u(116) }]}>{initials(hall.role)}</Text>
+              <Text style={[st.avatarText, { fontSize: u(80), lineHeight: u(100), letterSpacing: u(2) }]}>{initials(hall.role)}</Text>
             </Touchable>
           ) : null}
         </View>
@@ -143,25 +146,27 @@ export function CompactBrandHeader({ topInset, showProfile = true }: { topInset:
   );
 }
 
-const st = StyleSheet.create({
-  rim: { backgroundColor: RIM_GOLD, boxShadow: '0px 6px 14px rgba(70, 20, 25, 0.18)' },
-  panel: { overflow: 'hidden', backgroundColor: '#5E0620' },
-  row: { position: 'absolute', flexDirection: 'row', alignItems: 'center' },
-  center: { alignItems: 'center', justifyContent: 'center' },
-  hallName: { fontFamily: F.pageSerif, color: IVORY, flexShrink: 1 },
-  bellDot: { position: 'absolute', backgroundColor: '#E5252F', borderColor: IVORY },
-  avatar: {
-    position: 'absolute',
-    backgroundColor: '#C89D6E',
-    borderColor: IVORY,
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0px 2px 6px rgba(30, 5, 10, 0.3)',
-  },
-  avatarText: { fontFamily: F.pageSerif, color: IVORY },
-});
+const useSt = makeStyles((t) =>
+  StyleSheet.create({
+    rim: { backgroundColor: RIM_GOLD, boxShadow: `0px 6px 14px ${t.shadow}` },
+    panel: { overflow: 'hidden', backgroundColor: t.C.primaryDark },
+    row: { position: 'absolute', flexDirection: 'row', alignItems: 'center' },
+    center: { alignItems: 'center', justifyContent: 'center' },
+    hallName: { fontFamily: F.medium, color: IVORY, flexShrink: 1 },
+    bellDot: { position: 'absolute', backgroundColor: t.C.danger, borderColor: IVORY },
+    avatar: {
+      position: 'absolute',
+      backgroundColor: t.C.accent,
+      borderColor: IVORY,
+      alignItems: 'center',
+      justifyContent: 'center',
+      boxShadow: `0px 2px 6px ${t.shadow}`,
+    },
+    avatarText: { fontFamily: F.semibold, color: IVORY },
+  }),
+);
 
-/** Burgundy panel, gold swoosh, venue photo and quote, with the live text and buttons removed. */
+/** Header panel, gold swoosh, venue photo and quote, with the live text and buttons removed. */
 const PHOTO_BG = require('../../assets/images/header/brand-header-bg.jpg');
 
 /** Reference artboard the photo header is laid out against. */
@@ -179,10 +184,12 @@ const PHOTO_BOOK_STOPS = [
 ] as const;
 
 /**
- * Burgundy header for the Calendar tab: wordmark, hall switcher and tagline on the left, the venue
+ * Blue header for the Calendar tab: wordmark, hall switcher and tagline on the left, the venue
  * photo behind a gold swoosh on the right with bell, profile and quote.
  */
 export function PhotoBrandHeader({ topInset }: { topInset: number }) {
+  const t = useTheme();
+  const pst = usePst();
   const { hall, bookings } = useStore();
   const { width } = useWindowDimensions();
   const today = todayISO();
@@ -215,7 +222,7 @@ export function PhotoBrandHeader({ topInset }: { topInset: number }) {
       <Image source={PHOTO_BG} contentFit="fill" pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: topInset, height: artH }} />
 
       <View style={{ position: 'absolute', left: 0, right: 0, top: topInset, height: artH }}>
-        {/* Wordmark: ivory "Hall", gold-foil "Book" */}
+        {/* Wordmark: ivory "Banyan", gold-foil "Meadows" */}
         <Svg pointerEvents="none" style={StyleSheet.absoluteFill} viewBox={`0 0 ${PHOTO_REF_W} ${PHOTO_REF_H}`}>
           <Defs>
             <LinearGradient id={`${id}-book`} x1="0" y1="0" x2="0" y2="1">
@@ -224,11 +231,11 @@ export function PhotoBrandHeader({ topInset }: { topInset: number }) {
               ))}
             </LinearGradient>
           </Defs>
-          <SvgText x={123} y={260} fontFamily={F.serifBold} fontSize={215} letterSpacing={-5} fill={IVORY}>
-            Hall
-          </SvgText>
-          <SvgText x={486} y={260} fontFamily={F.serifBold} fontSize={215} letterSpacing={-1} fill={`url(#${id}-book)`}>
-            Book
+          <SvgText x={123} y={256} fontFamily={F.semibold} fontSize={132} letterSpacing={-2.5} fill={IVORY}>
+            <TSpan>Banyan</TSpan>
+            <TSpan dx={32} letterSpacing={-2.5} fill={`url(#${id}-book)`}>
+              Meadows
+            </TSpan>
           </SvgText>
         </Svg>
 
@@ -237,7 +244,7 @@ export function PhotoBrandHeader({ topInset }: { topInset: number }) {
           accessibilityLabel="Hall details"
           style={[pst.row, { left: u(113), top: u(302), height: u(95), maxWidth: u(1000) }]}>
           <MaterialCommunityIcons name="bank" size={u(92)} color={PHOTO_GOLD} />
-          <Text numberOfLines={1} style={[pst.hallName, { marginLeft: u(42), fontSize: u(79), lineHeight: u(95) }]}>
+          <Text numberOfLines={1} style={[pst.hallName, { marginLeft: u(42), fontSize: u(70), lineHeight: u(95) }]}>
             {hall.name}
           </Text>
           <Ionicons name="chevron-down" size={u(67)} color={IVORY} style={{ marginLeft: u(27), marginTop: u(8) }} />
@@ -259,7 +266,7 @@ export function PhotoBrandHeader({ topInset }: { topInset: number }) {
           accessibilityLabel="Notifications"
           hitSlop={10}
           style={[pst.bell, { left: u(1773.5) - bell / 2, top: u(146.5) - bell / 2, width: bell, height: bell, borderRadius: bell / 2 }]}>
-          <Ionicons name="notifications-outline" size={u(76)} color="#1F1A17" />
+          <Ionicons name="notifications-outline" size={u(76)} color={t.G.ink} />
           {hasUpcoming ? (
             <View style={[pst.bellDot, { left: u(1806 - 1711 - 13), top: u(117 - 84 - 13), width: u(26), height: u(26), borderRadius: u(13) }]} />
           ) : null}
@@ -280,35 +287,37 @@ export function PhotoBrandHeader({ topInset }: { topInset: number }) {
               borderWidth: Math.max(u(5), 1),
             },
           ]}>
-          <Text style={[pst.avatarText, { fontSize: u(70), lineHeight: u(84) }]}>{initials(hall.role)}</Text>
+          <Text style={[pst.avatarText, { fontSize: u(62), lineHeight: u(80), letterSpacing: u(2) }]}>{initials(hall.role)}</Text>
         </Touchable>
       </View>
     </View>
   );
 }
 
-const pst = StyleSheet.create({
-  header: { overflow: 'hidden', backgroundColor: '#620D24' },
-  abs: { position: 'absolute' },
-  row: { position: 'absolute', flexDirection: 'row', alignItems: 'center' },
-  hallName: { fontFamily: F.serifBold, color: IVORY, flexShrink: 1 },
-  tagline: { position: 'absolute', fontFamily: F.medium, color: PHOTO_TAGLINE },
-  bell: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FBF2E7',
-    boxShadow: '0px 2px 6px rgba(60, 20, 10, 0.25)',
-  },
-  bellDot: { position: 'absolute', backgroundColor: '#F3162D' },
-  divider: { position: 'absolute', backgroundColor: 'rgba(255, 255, 255, 0.9)' },
-  avatar: {
-    position: 'absolute',
-    backgroundColor: '#B88843',
-    borderColor: IVORY,
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0px 2px 6px rgba(60, 20, 10, 0.25)',
-  },
-  avatarText: { fontFamily: F.medium, color: IVORY },
-});
+const usePst = makeStyles((t) =>
+  StyleSheet.create({
+    header: { overflow: 'hidden', backgroundColor: t.C.primaryDark },
+    abs: { position: 'absolute' },
+    row: { position: 'absolute', flexDirection: 'row', alignItems: 'center' },
+    hallName: { fontFamily: F.semibold, color: IVORY, flexShrink: 1 },
+    tagline: { position: 'absolute', fontFamily: F.medium, color: PHOTO_TAGLINE },
+    bell: {
+      position: 'absolute',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.surface,
+      boxShadow: `0px 2px 6px ${t.shadow}`,
+    },
+    bellDot: { position: 'absolute', backgroundColor: t.C.danger },
+    divider: { position: 'absolute', backgroundColor: t.glassBorder },
+    avatar: {
+      position: 'absolute',
+      backgroundColor: t.C.accent,
+      borderColor: IVORY,
+      alignItems: 'center',
+      justifyContent: 'center',
+      boxShadow: `0px 2px 6px ${t.shadow}`,
+    },
+    avatarText: { fontFamily: F.semibold, color: IVORY },
+  }),
+);

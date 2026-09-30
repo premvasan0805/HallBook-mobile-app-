@@ -18,19 +18,21 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { GlossTile, GradientFill, Sheen } from '@/components/glass';
 import { IconButton, PrimaryButton, SecondaryButton } from '@/components/primitives';
 import { InPopupContext } from '@/components/sheet-context';
-import { APP_MAX_WIDTH, appWidth, C, F, G } from '@/lib/theme';
+import { APP_MAX_WIDTH, appWidth, F } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/lib/theme-context';
 
 const SHEET_R = 28;
 
 /** Web: the page shows through the sheet, blurred. Native has no backdrop filter, so the fill stays near-opaque. */
 const FROSTED = Platform.OS === 'web';
 const frostBlur = FROSTED
-  ? ({ backdropFilter: 'blur(26px) saturate(1.5)', WebkitBackdropFilter: 'blur(26px) saturate(1.5)' } as unknown as ViewStyle)
+  ? ({ backdropFilter: 'blur(35px) saturate(1.4)', WebkitBackdropFilter: 'blur(35px) saturate(1.4)' } as unknown as ViewStyle)
   : null;
 
 /** Wrapper that keeps modal content inside the phone column on web. */
 function Column({ children, center }: { children: ReactNode; center?: boolean }) {
   const { width } = useWindowDimensions();
+  const st = useSt();
   return <View style={[st.column, { width: appWidth(width) }, center ? st.center : st.bottom]}>{children}</View>;
 }
 
@@ -56,6 +58,7 @@ export function BottomSheet({
   backdropColor?: string;
 }) {
   const { height } = useWindowDimensions();
+  const st = useSt();
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
       <InPopupContext.Provider value>
@@ -115,6 +118,8 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const t = useTheme();
+  const st = useSt();
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onCancel}>
       <InPopupContext.Provider value>
@@ -125,14 +130,14 @@ export function ConfirmDialog({
           <Animated.View entering={ZoomIn.duration(180)} style={[st.dialog, frostBlur]}>
             <SheetGlass radius={22} />
             <GlossTile
-              from={destructive ? '#FEF0F3' : '#EEF5FE'}
-              to={destructive ? '#FAD6DE' : '#D3E4FB'}
+              from={destructive ? t.tone.rose.from : t.tone.blue.from}
+              to={destructive ? t.tone.rose.to : t.tone.blue.to}
               radius={24}
               style={st.dialogIcon}>
               <Ionicons
                 name={destructive ? 'alert-circle-outline' : 'help-circle-outline'}
                 size={24}
-                color={destructive ? C.danger : G.blue}
+                color={destructive ? t.C.danger : t.G.blue}
               />
             </GlossTile>
             <Text style={st.dialogTitle}>{title}</Text>
@@ -152,25 +157,34 @@ export function ConfirmDialog({
   );
 }
 
-/** Pale blue frosted fill for a popup: soft vertical gradient plus a bright sheen across the top. */
+/** Strong frosted glass for a popup: warm white (≈0.72) in light mode, smoked warm glass in dark, faint sheen on top. */
 function SheetGlass({ radius }: { radius: number }) {
+  const t = useTheme();
   return (
     <>
-      <GradientFill from="#F8FBFF" to="#E1EBFA" radius={radius} fromOpacity={FROSTED ? 0.66 : 1} toOpacity={FROSTED ? 0.6 : 1} />
-      <Sheen radius={radius} strength={0.7} height="18%" />
+      <GradientFill
+        from={t.dark ? '#26221C' : '#FFFFFF'}
+        to={t.dark ? '#16140F' : '#FAF6EC'}
+        radius={radius}
+        fromOpacity={FROSTED ? (t.dark ? 0.78 : 0.76) : 0.97}
+        toOpacity={FROSTED ? (t.dark ? 0.84 : 0.68) : 0.97}
+      />
+      <Sheen radius={radius} strength={0.5} height="18%" />
     </>
   );
 }
 
-/** Glossy red confirm button for destructive dialogs. */
+/** Soft coral confirm button for destructive dialogs. */
 function Touch({ label, onPress }: { label: string; onPress: () => void }) {
+  const t = useTheme();
+  const st = useSt();
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [st.dangerBtn, pressed && { opacity: 0.85 }]}
       accessibilityRole="button">
-      <GradientFill from="#E0485A" to="#A51F31" radius={11} />
-      <Sheen radius={11} strength={0.35} height="50%" />
+      <GradientFill from={t.dark ? '#B8646A' : '#CD6A70'} to={t.dark ? '#9C4E55' : t.C.danger} radius={11} />
+      <Sheen radius={11} strength={0.25} height="50%" />
       <Text style={st.dangerText}>{label}</Text>
     </Pressable>
   );
@@ -185,6 +199,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<Toast | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const insets = useSafeAreaInsets();
+  const t = useTheme();
+  const st = useSt();
 
   const show = useCallback((message: string, tone: Toast['tone'] = 'success') => {
     if (timer.current) clearTimeout(timer.current);
@@ -198,12 +214,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {toast ? (
         <View pointerEvents="none" style={[st.toastWrap, { top: insets.top + 8 }]}>
           <Animated.View key={toast.id} entering={FadeInUp.duration(200)} exiting={FadeOutUp} style={st.toast}>
-            <GradientFill from="#3A6FD0" to="#1C3F8E" radius={13} horizontal />
-            <Sheen radius={13} strength={0.3} height="50%" />
+            <GradientFill from={t.G.gradFrom} to={t.G.gradTo} radius={13} horizontal />
+            <Sheen radius={13} strength={0.25} height="50%" />
             <Ionicons
               name={toast.tone === 'success' ? 'checkmark-circle' : 'alert-circle'}
               size={18}
-              color={toast.tone === 'success' ? '#BFE0FF' : C.dangerBorder}
+              color={toast.tone === 'success' ? t.C.onPrimarySoft : t.dark ? t.C.danger : t.C.dangerBorder}
             />
             <Text style={st.toastText}>{toast.message}</Text>
           </Animated.View>
@@ -215,71 +231,79 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
 export const useToast = () => useContext(ToastCtx);
 
-const st = StyleSheet.create({
-  column: { flex: 1, alignSelf: 'center', overflow: 'hidden' },
-  bottom: { justifyContent: 'flex-end' },
-  center: { justifyContent: 'center', padding: 24 },
-  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(19, 29, 56, 0.22)' },
-  sheet: {
-    borderTopLeftRadius: SHEET_R,
-    borderTopRightRadius: SHEET_R,
-    paddingHorizontal: 18,
-    paddingBottom: 12,
-    borderWidth: 1.5,
-    borderBottomWidth: 0,
-    borderColor: 'rgba(255, 255, 255, 0.95)',
-    boxShadow:
-      'inset 0px 2px 0px rgba(255, 255, 255, 1), inset 0px 0px 24px rgba(255, 255, 255, 0.8), 0px 0px 18px rgba(255, 255, 255, 0.6), 0px -8px 30px rgba(31, 58, 112, 0.18)',
-  },
-  grabber: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4.5,
-    borderRadius: 3,
-    backgroundColor: 'rgba(79, 134, 230, 0.75)',
-    marginTop: 10,
-    marginBottom: 12,
-  },
-  sheetHead: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 2, paddingBottom: 14, paddingLeft: 12 },
-  sheetTitle: { fontFamily: F.pageSerifBold, fontSize: 21, lineHeight: 27, letterSpacing: -0.3, color: G.ink },
-  sheetSub: { fontFamily: F.regular, fontSize: 12, lineHeight: 16, color: G.ink, marginTop: 2, letterSpacing: 0.3 },
-  /** Small inset so child glass rims and glows are not clipped by the scroll view. */
-  sheetBody: { gap: 12, paddingBottom: 8, paddingHorizontal: 3, paddingTop: 3 },
-  dialog: {
-    borderRadius: 22,
-    padding: 22,
-    alignItems: 'center',
-    gap: 6,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.95)',
-    boxShadow:
-      'inset 0px 2px 0px rgba(255, 255, 255, 1), inset 0px 0px 22px rgba(255, 255, 255, 0.8), 0px 0px 20px rgba(255, 255, 255, 0.5), 0px 14px 34px rgba(19, 29, 56, 0.25)',
-  },
-  dialogIcon: { width: 48, height: 48, marginBottom: 4 },
-  dialogTitle: { fontFamily: F.pageSerifBold, fontSize: 18, lineHeight: 23, color: G.ink, textAlign: 'center' },
-  dialogMsg: { fontFamily: F.regular, fontSize: 12.5, lineHeight: 18, color: G.muted, textAlign: 'center' },
-  dangerBtn: {
-    minHeight: 46,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 220, 225, 0.95)',
-    boxShadow: 'inset 0px 1px 0px rgba(255, 255, 255, 0.5), 0px 0px 12px rgba(224, 72, 90, 0.35), 0px 6px 14px rgba(165, 31, 49, 0.25)',
-  },
-  dangerText: { fontFamily: F.semibold, fontSize: 14.5, color: '#FFFFFF' },
-  toastWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', paddingHorizontal: 20 },
-  toast: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
-    maxWidth: APP_MAX_WIDTH - 40,
-    borderWidth: 1.2,
-    borderColor: 'rgba(200, 222, 255, 0.9)',
-    boxShadow: '0px 0px 14px rgba(90, 145, 240, 0.45), 0px 8px 20px rgba(19, 29, 56, 0.25)',
-  },
-  toastText: { fontFamily: F.medium, fontSize: 13, color: '#FFFFFF', flexShrink: 1 },
-});
+const useSt = makeStyles((t) =>
+  StyleSheet.create({
+    column: { flex: 1, alignSelf: 'center', overflow: 'hidden' },
+    bottom: { justifyContent: 'flex-end' },
+    center: { justifyContent: 'center', padding: 24 },
+    backdrop: { ...StyleSheet.absoluteFill, backgroundColor: t.G.overlay },
+    sheet: {
+      borderTopLeftRadius: SHEET_R,
+      borderTopRightRadius: SHEET_R,
+      paddingHorizontal: 18,
+      paddingBottom: 12,
+      borderWidth: 1.5,
+      borderBottomWidth: 0,
+      borderColor: t.dark ? 'rgba(255, 255, 255, 0.20)' : 'rgba(255, 255, 255, 0.75)',
+      boxShadow: t.dark
+        ? `inset 0px 1px 0px rgba(255, 255, 255, 0.12), 0px -8px 30px ${t.shadow}`
+        : 'inset 0px 1px 0px rgba(255, 255, 255, 0.9), 0px -8px 30px rgba(30, 30, 30, 0.10)',
+    },
+    grabber: {
+      alignSelf: 'center',
+      width: 40,
+      height: 4.5,
+      borderRadius: 3,
+      backgroundColor: t.dark ? 'rgba(255, 255, 255, 0.24)' : 'rgba(37, 37, 37, 0.18)',
+      marginTop: 10,
+      marginBottom: 12,
+    },
+    sheetHead: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 2, paddingBottom: 14, paddingLeft: 12 },
+    sheetTitle: { fontFamily: F.semibold, fontSize: 19, lineHeight: 24, letterSpacing: -0.3, color: t.G.ink },
+    sheetSub: { fontFamily: F.regular, fontSize: 12, lineHeight: 17, color: t.G.ink, marginTop: 2, letterSpacing: 0 },
+    /** Small inset so child glass rims and glows are not clipped by the scroll view. */
+    sheetBody: { gap: 12, paddingBottom: 8, paddingHorizontal: 3, paddingTop: 3 },
+    dialog: {
+      borderRadius: 22,
+      padding: 22,
+      alignItems: 'center',
+      gap: 6,
+      borderWidth: 1.5,
+      borderColor: t.dark ? 'rgba(255, 255, 255, 0.20)' : 'rgba(255, 255, 255, 0.75)',
+      boxShadow: t.dark
+        ? `inset 0px 1px 0px rgba(255, 255, 255, 0.12), 0px 14px 34px ${t.shadow}`
+        : 'inset 0px 1px 0px rgba(255, 255, 255, 0.9), 0px 14px 34px rgba(30, 30, 30, 0.14)',
+    },
+    dialogIcon: { width: 48, height: 48, marginBottom: 4 },
+    dialogTitle: { fontFamily: F.semibold, fontSize: 17, lineHeight: 22, letterSpacing: -0.2, color: t.G.ink, textAlign: 'center' },
+    dialogMsg: { fontFamily: F.regular, fontSize: 12.5, lineHeight: 18, color: t.G.muted, textAlign: 'center' },
+    dangerBtn: {
+      minHeight: 46,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1.5,
+      borderColor: t.dark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.5)',
+      boxShadow: t.dark
+        ? `inset 0px 1px 0px rgba(255, 255, 255, 0.1), 0px 4px 12px ${t.shadow}`
+        : 'inset 0px 1px 0px rgba(255, 255, 255, 0.3), 0px 4px 12px rgba(194, 84, 90, 0.18)',
+    },
+    dangerText: { fontFamily: F.semibold, fontSize: 14, color: t.G.onBlue },
+    toastWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', paddingHorizontal: 20 },
+    toast: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 9,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 14,
+      maxWidth: APP_MAX_WIDTH - 40,
+      borderWidth: 1.2,
+      borderColor: t.G.buttonBorder,
+      boxShadow: t.dark
+        ? `inset 0px 1px 0px rgba(255, 255, 255, 0.1), 0px 8px 20px ${t.shadow}`
+        : 'inset 0px 1px 0px rgba(255, 255, 255, 0.3), 0px 8px 20px rgba(30, 30, 30, 0.14)',
+    },
+    toastText: { fontFamily: F.medium, fontSize: 13, lineHeight: 18, color: t.G.onBlue, flexShrink: 1 },
+  }),
+);

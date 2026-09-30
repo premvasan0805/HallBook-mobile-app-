@@ -14,17 +14,12 @@ import { OptionCard } from "@/components/form";
 import { BottomSheet } from "@/components/overlays";
 import { goBack, Screen, Touchable } from "@/components/primitives";
 import { appWidth, F } from "@/lib/theme";
+import { useTheme } from "@/lib/theme-context";
 
 type Ion = ComponentProps<typeof Ionicons>["name"];
 
 /** Laid out on an 875px-wide design reference; `u(px)` converts a reference pixel to dp. */
 const REF_WIDTH = 875;
-
-const BURGUNDY = "#7B1030";
-const INK = "#1A1A22";
-const GREY = "#676A73";
-const PINK = "#FAE7E9";
-const RULE = "#F1E8E1";
 
 const ITEMS: { key: string; icon: Ion; title: string; sub: string }[] = [
   {
@@ -55,6 +50,7 @@ const ITEMS: { key: string; icon: Ion; title: string; sub: string }[] = [
 
 export default function NotificationSettingsScreen() {
   const { width } = useWindowDimensions();
+  const t = useTheme();
   const u = (px: number) => (appWidth(width) / REF_WIDTH) * px;
   const [menu, setMenu] = useState(false);
   const [v, setV] = useState<Record<string, boolean>>({
@@ -83,9 +79,9 @@ export default function NotificationSettingsScreen() {
           justifyContent: "center",
         }}
       >
-        <Ionicons name="arrow-back" size={u(48)} color={BURGUNDY} />
+        <Ionicons name="arrow-back" size={u(48)} color={t.C.primary} />
       </Touchable>
-      {/* Title fades from burgundy into gold across "Notifications". */}
+      {/* Title fades from blue into gold across "Notifications". */}
       <View
         accessible
         accessibilityRole="header"
@@ -102,15 +98,16 @@ export default function NotificationSettingsScreen() {
               x2={170}
               y2={0}
             >
-              <Stop offset="0" stopColor={BURGUNDY} />
-              <Stop offset="1" stopColor="#A8733F" />
+              <Stop offset="0" stopColor={t.C.primary} />
+              <Stop offset="1" stopColor={t.C.accent} />
             </LinearGradient>
           </Defs>
           <SvgText
             x={0}
             y={53.5}
-            fontFamily={F.pageSerifBold}
-            fontSize={48.3}
+            fontFamily={F.semibold}
+            fontSize={47}
+            letterSpacing={-0.5}
             fill="url(#notifTitle)"
           >
             Notifications
@@ -130,7 +127,7 @@ export default function NotificationSettingsScreen() {
           justifyContent: "center",
         }}
       >
-        <Ionicons name="ellipsis-vertical" size={u(46)} color={BURGUNDY} />
+        <Ionicons name="ellipsis-vertical" size={u(46)} color={t.C.primary} />
       </Touchable>
     </View>
   );
@@ -146,7 +143,7 @@ export default function NotificationSettingsScreen() {
           fontFamily: F.regular,
           fontSize: u(25.2),
           lineHeight: u(32),
-          color: GREY,
+          color: t.C.textSecondary,
         }}
       >
         Choose what reminders you want to receive
@@ -158,9 +155,9 @@ export default function NotificationSettingsScreen() {
           marginHorizontal: u(28),
           borderRadius: u(26),
           borderWidth: 1.5,
-          borderColor: "#EFE6DF",
-          backgroundColor: "#FCFBF9",
-          boxShadow: `0px ${u(6)}px ${u(18)}px rgba(120, 70, 40, 0.06)`,
+          borderColor: t.C.border,
+          backgroundColor: t.surface,
+          boxShadow: `0px ${u(6)}px ${u(18)}px ${t.shadow}`,
           overflow: "hidden",
         }}
       >
@@ -177,7 +174,7 @@ export default function NotificationSettingsScreen() {
               width: u(66),
               height: u(66),
               borderRadius: u(33),
-              backgroundColor: "#FBE9EB",
+              backgroundColor: t.C.primarySoft,
               alignItems: "center",
               justifyContent: "center",
             }}
@@ -185,17 +182,17 @@ export default function NotificationSettingsScreen() {
             <Ionicons
               name="notifications-outline"
               size={u(38)}
-              color={BURGUNDY}
+              color={t.C.primary}
             />
           </View>
           <Text
             style={{
               marginLeft: u(24),
-              fontFamily: F.bold,
-              fontSize: u(24.2),
+              fontFamily: F.semibold,
+              fontSize: u(23),
               lineHeight: u(30),
-              color: BURGUNDY,
-              letterSpacing: u(0.3),
+              color: t.C.primary,
+              letterSpacing: u(1.4),
             }}
           >
             REMINDERS
@@ -216,7 +213,7 @@ export default function NotificationSettingsScreen() {
               paddingLeft: u(38),
               paddingRight: u(40),
               borderTopWidth: 1.2,
-              borderTopColor: RULE,
+              borderTopColor: t.C.border,
             }}
           >
             <View
@@ -224,20 +221,20 @@ export default function NotificationSettingsScreen() {
                 width: u(86),
                 height: u(86),
                 borderRadius: u(43),
-                backgroundColor: PINK,
+                backgroundColor: t.C.primarySoft,
                 alignItems: "center",
                 justifyContent: "center",
               }}
             >
-              <Ionicons name={item.icon} size={u(44)} color={BURGUNDY} />
+              <Ionicons name={item.icon} size={u(44)} color={t.C.primary} />
             </View>
             <View style={{ flex: 1, marginLeft: u(33), marginRight: u(16) }}>
               <Text
                 style={{
-                  fontFamily: F.pageSerifBold,
-                  fontSize: u(28),
-                  lineHeight: u(34),
-                  color: INK,
+                  fontFamily: F.semibold,
+                  fontSize: u(30),
+                  lineHeight: u(36),
+                  color: t.C.text,
                 }}
                 numberOfLines={1}
               >
@@ -246,10 +243,10 @@ export default function NotificationSettingsScreen() {
               <Text
                 style={{
                   fontFamily: F.regular,
-                  fontSize: u(23),
-                  lineHeight: u(30),
-                  color: GREY,
-                  marginTop: u(8),
+                  fontSize: u(23.5),
+                  lineHeight: u(32),
+                  color: t.C.textSecondary,
+                  marginTop: u(6),
                 }}
                 numberOfLines={1}
               >
@@ -283,15 +280,16 @@ export default function NotificationSettingsScreen() {
   );
 }
 
-/** Burgundy track with a gold knob when on; warm grey track with a white knob when off. */
+/** Blue track with a soft gold knob when on; grey track with a white knob when off. */
 function Toggle({ on, u }: { on: boolean; u: (px: number) => number }) {
+  const t = useTheme();
   return (
     <View
       style={{
         width: u(98),
         height: u(44),
         borderRadius: u(22),
-        backgroundColor: on ? "#720D30" : "#DDD2C9",
+        backgroundColor: on ? t.C.primary : t.C.borderStrong,
         justifyContent: "center",
       }}
     >
@@ -304,9 +302,9 @@ function Toggle({ on, u }: { on: boolean; u: (px: number) => number }) {
           borderRadius: u(23),
           overflow: "hidden",
           borderWidth: on ? u(2) : 0,
-          borderColor: "#7A1233",
-          backgroundColor: "#FFFFFF",
-          boxShadow: `0px ${u(3)}px ${u(8)}px rgba(40, 10, 10, 0.25)`,
+          borderColor: t.C.primaryDark,
+          backgroundColor: t.C.onPrimary,
+          boxShadow: `0px ${u(3)}px ${u(8)}px ${t.dark ? "rgba(0, 0, 0, 0.4)" : "rgba(30, 30, 30, 0.18)"}`,
         }}
       >
         {on ? (
@@ -318,8 +316,8 @@ function Toggle({ on, u }: { on: boolean; u: (px: number) => number }) {
           >
             <Defs>
               <LinearGradient id="knobGold" x1="0" y1="0" x2="1" y2="1">
-                <Stop offset="0" stopColor="#FBEBD3" />
-                <Stop offset="1" stopColor="#E0BB88" />
+                <Stop offset="0" stopColor={t.C.onPrimary} />
+                <Stop offset="1" stopColor={t.C.accentOnPrimary} />
               </LinearGradient>
             </Defs>
             <Rect x={0} y={0} width={10} height={10} fill="url(#knobGold)" />

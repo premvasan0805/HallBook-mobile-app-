@@ -26,9 +26,10 @@ import Animated, {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
-import { glassSurface, GradientFill, Sheen } from '@/components/glass';
+import { backdropBlur, GlassBackdrop, glassSurface, glassTier, GradientFill, Sheen } from '@/components/glass';
 import { useInPopup } from '@/components/sheet-context';
-import { C, elevation, G, radius, space, T, tabBarClearance } from '@/lib/theme';
+import { F, radius, space, tabBarClearance, type Theme } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/lib/theme-context';
 
 export type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -71,11 +72,13 @@ export function AppHeader({
   right?: ReactNode;
   subtitle?: string;
 }) {
+  const { T } = useTheme();
+  const st = useSt();
   return (
     <View style={st.header}>
       {back && <IconButton icon="arrow-back" onPress={goBack} plain accessibilityLabel="Back" />}
       <View style={{ flex: 1 }}>
-        <Text style={[T.screenTitle, back && { fontSize: 21, lineHeight: 28 }]} numberOfLines={1}>
+        <Text style={[T.screenTitle, back && { fontSize: 20, lineHeight: 25, letterSpacing: -0.2 }]} numberOfLines={1}>
           {title}
         </Text>
         {subtitle ? <Text style={T.secondary}>{subtitle}</Text> : null}
@@ -114,10 +117,11 @@ export function Screen({
   onRefresh?: () => Promise<void> | void;
   tab?: boolean;
   contentStyle?: StyleProp<ViewStyle>;
-  /** Full-bleed layer drawn behind the header and body (the page background turns transparent). */
+  /** Full-bleed layer drawn behind the header and body. Defaults to the shared blurred-venue glass backdrop. */
   backdrop?: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
+  const st = useSt();
   const { scrollRef, rootRef, scrolled, onScroll } = useSmoothScroll<ScrollView>(scroll);
   const clear = tab && !footer ? { paddingBottom: tabBarClearance(insets.bottom) } : null;
   const body = scroll ? (
@@ -138,12 +142,10 @@ export function Screen({
   );
 
   return (
-    <SafeAreaView ref={rootRef} style={[st.screen, backdrop ? { backgroundColor: 'transparent' } : null]} edges={['top']}>
-      {backdrop ? (
-        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-          {backdrop}
-        </View>
-      ) : null}
+    <SafeAreaView ref={rootRef} style={st.screen} edges={['top']}>
+      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        {backdrop ?? <GlassBackdrop />}
+      </View>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -280,6 +282,7 @@ function ScrollFadeMask({ faded }: { faded: boolean }) {
 
 function Refresh({ onRefresh }: { onRefresh: () => Promise<void> | void }) {
   const [refreshing, setRefreshing] = useState(false);
+  const { C } = useTheme();
   return (
     <RefreshControl
       refreshing={refreshing}
@@ -303,6 +306,7 @@ export function Card({
   style?: StyleProp<ViewStyle>;
   onPress?: () => void;
 }) {
+  const st = useSt();
   if (onPress) {
     return (
       <Touchable onPress={onPress} style={[st.card, style]}>
@@ -324,12 +328,14 @@ export function SectionHeader({
   onAction?: () => void;
   style?: StyleProp<ViewStyle>;
 }) {
+  const { C, T } = useTheme();
+  const st = useSt();
   return (
     <View style={[st.sectionHeader, style]}>
       <Text style={T.section}>{title}</Text>
       {action ? (
         <Touchable onPress={onAction} hitSlop={8} style={st.sectionAction}>
-          <Text style={[T.secondary, { color: C.primary, fontFamily: 'Inter_600SemiBold' }]}>{action}</Text>
+          <Text style={[T.secondary, { color: C.primary, fontFamily: F.medium, fontSize: 13.5 }]}>{action}</Text>
           <Ionicons name="chevron-forward" size={14} color={C.primary} />
         </Touchable>
       ) : null}
@@ -338,6 +344,7 @@ export function SectionHeader({
 }
 
 export function Divider({ inset = 0 }: { inset?: number }) {
+  const { C } = useTheme();
   return <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: C.border, marginLeft: inset }} />;
 }
 
@@ -351,61 +358,57 @@ type BtnProps = {
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
   compact?: boolean;
-  /** Popup primary only: overrides the label font (e.g. a serif call-to-action). */
+  /** Popup primary only: overrides the label font (e.g. a custom call-to-action). */
   titleStyle?: StyleProp<TextStyle>;
 };
 
 export function PrimaryButton({ title, onPress, icon, disabled, loading, style, compact, titleStyle }: BtnProps) {
-  const popup = useInPopup();
-  if (popup) {
-    // Glossy blue button with a white rim and glow, matching the glass screens' main actions.
+  const t = useTheme();
+  const { G } = t;
+  const st = useSt();
+  {
+    // Gold glass button: translucent gold light over the blurred backdrop, a thin light rim and a soft gold shadow.
     return (
       // Disabled stays glossy (dimmed less than the default 0.5) so the popup keeps its bright call-to-action.
       <Touchable
         accessibilityRole="button"
         accessibilityState={{ disabled: !!(disabled || loading) }}
         onPress={disabled || loading ? undefined : onPress}
-        style={[st.btn, st.glassBtn, compact && st.btnCompact, style, (disabled || loading) && { opacity: 0.85 }]}>
-        <GradientFill from="#5C9BF5" to="#2459D0" radius={compact ? 9 : 14} />
-        <Sheen radius={compact ? 9 : 14} strength={0.35} height="50%" />
-        {compact ? null : <ButtonTrails radius={14} />}
+        style={[st.btn, st.glassBtn, st.goldBtn, compact && st.btnCompact, style, (disabled || loading) && { opacity: 0.85 }]}>
+        {/* Deep gold body: lighter top-left, richer amber low down — solid enough that the label always reads. */}
+        <GradientFill from={t.dark ? '#C99E40' : '#E2BF6A'} to={t.dark ? '#9C7424' : '#B8862C'} radius={compact ? 9 : 16} fromOpacity={0.97} toOpacity={0.97} />
+        <Sheen radius={compact ? 9 : 16} strength={0.3} height="45%" />
+        {compact ? null : <ButtonTrails radius={16} t={t} />}
         {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
+          <ActivityIndicator color={G.onBlue} />
         ) : (
           <>
-            {icon && <Ionicons name={icon} size={compact ? 17 : 20} color="#FFFFFF" />}
-            <Text style={[st.glassBtnText, titleStyle]}>{title}</Text>
+            {icon &&
+              (compact ? (
+                <Ionicons name={icon} size={17} color={G.onBlue} />
+              ) : (
+                // Icon sits in a small frosted disc, like a glass bead set into the gold.
+                <View style={st.goldBtnIcon}>
+                  <Ionicons name={icon} size={17} color={G.onBlue} />
+                </View>
+              ))}
+            <Text style={[st.glassBtnText, !compact && st.goldBtnText, titleStyle]}>{title}</Text>
           </>
         )}
       </Touchable>
     );
   }
-  return (
-    <Touchable
-      accessibilityRole="button"
-      disabled={disabled || loading}
-      onPress={onPress}
-      style={[st.btn, compact && st.btnCompact, { backgroundColor: C.primary }, style]}>
-      {loading ? (
-        <ActivityIndicator color={C.onPrimary} />
-      ) : (
-        <>
-          {icon && <Ionicons name={icon} size={18} color={C.onPrimary} />}
-          <Text style={[T.button, { color: C.onPrimary }]}>{title}</Text>
-        </>
-      )}
-    </Touchable>
-  );
 }
 
-/** Faint white light curves across a glossy blue button. */
-function ButtonTrails({ radius: r }: { radius: number }) {
+/** Faint light curves across a gold glass button — subtle reflections, dimmed further in dark mode. */
+function ButtonTrails({ radius: r, t }: { radius: number; t: Theme }) {
+  const k = t.dark ? 0.5 : 0.8;
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: r, overflow: 'hidden' }]}>
       <Svg width="100%" height="100%" viewBox="0 0 400 50" preserveAspectRatio="none">
-        <Path d="M0 40C70 24 130 48 200 34S330 12 400 24" stroke="#FFFFFF" strokeOpacity={0.2} strokeWidth={1} fill="none" />
-        <Path d="M240 50C290 34 340 22 400 6" stroke="#FFFFFF" strokeOpacity={0.28} strokeWidth={1} fill="none" />
-        <Path d="M270 50C315 38 360 28 400 20" stroke="#FFFFFF" strokeOpacity={0.16} strokeWidth={1} fill="none" />
+        <Path d="M0 40C70 24 130 48 200 34S330 12 400 24" stroke={t.highlight} strokeOpacity={0.2 * k} strokeWidth={1} fill="none" />
+        <Path d="M240 50C290 34 340 22 400 6" stroke={t.highlight} strokeOpacity={0.28 * k} strokeWidth={1} fill="none" />
+        <Path d="M270 50C315 38 360 28 400 20" stroke={t.highlight} strokeOpacity={0.16 * k} strokeWidth={1} fill="none" />
       </Svg>
     </View>
   );
@@ -421,6 +424,8 @@ export function SecondaryButton({
   tone = 'primary',
 }: BtnProps & { tone?: 'primary' | 'danger' }) {
   const popup = useInPopup();
+  const { C, G, T } = useTheme();
+  const st = useSt();
   if (popup) {
     const color = tone === 'danger' ? C.danger : G.blue;
     return (
@@ -432,7 +437,7 @@ export function SecondaryButton({
           st.btn,
           st.glassGhost,
           compact && st.btnCompact,
-          { borderColor: tone === 'danger' ? C.dangerBorder : 'rgba(47, 99, 192, 0.5)' },
+          { borderColor: tone === 'danger' ? C.dangerBorder : G.focusBorder },
           style,
         ]}>
         {icon && <Ionicons name={icon} size={17} color={color} />}
@@ -449,7 +454,8 @@ export function SecondaryButton({
       style={[
         st.btn,
         compact && st.btnCompact,
-        { backgroundColor: C.surface, borderWidth: 1.2, borderColor: tone === 'danger' ? C.dangerBorder : C.primary },
+        st.glassGhost,
+        { borderWidth: 1.2, borderColor: tone === 'danger' ? C.dangerBorder : G.focusBorder },
         style,
       ]}>
       {icon && <Ionicons name={icon} size={18} color={color} />}
@@ -477,16 +483,18 @@ export function IconButton({
   badge?: boolean;
   accessibilityLabel?: string;
 }) {
-  const popup = useInPopup();
-  if (popup && !plain && !filled) {
-    // Frosted orb, like the back button on glass pages.
+  const t = useTheme();
+  const { C, G } = t;
+  const st = useSt();
+  if (!plain && !filled) {
+    // Frosted glass orb, like the back button on glass pages.
     return (
       <Touchable
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         hitSlop={6}
         onPress={onPress}
-        style={[st.iconBtn, glassSurface('rgba(255, 255, 255, 0.7)', size / 2), { width: size, height: size }]}>
+        style={[st.iconBtn, glassSurface(t, t.frost(0.7), size / 2), { width: size, height: size }]}>
         <Ionicons name={icon} size={Math.round(size * 0.5)} color={color ?? G.navy} />
         {badge && <View style={st.dotBadge} />}
       </Touchable>
@@ -527,6 +535,8 @@ export function EmptyState({
   onAction?: () => void;
 }) {
   const popup = useInPopup();
+  const { C, G, T } = useTheme();
+  const st = useSt();
   return (
     <View style={st.state}>
       <View style={[st.stateIcon, popup && { backgroundColor: G.soft }]}>
@@ -540,6 +550,8 @@ export function EmptyState({
 }
 
 export function ErrorState({ title = 'Something went wrong', message }: { title?: string; message?: string }) {
+  const { C, T } = useTheme();
+  const st = useSt();
   return (
     <View style={st.state}>
       <View style={[st.stateIcon, { backgroundColor: C.dangerSoft }]}>
@@ -553,6 +565,8 @@ export function ErrorState({ title = 'Something went wrong', message }: { title?
 }
 
 export function LoadingState() {
+  const { C } = useTheme();
+  const st = useSt();
   return (
     <View style={[st.state, { flex: 1, justifyContent: 'center' }]}>
       <ActivityIndicator color={C.primary} size="large" />
@@ -562,6 +576,7 @@ export function LoadingState() {
 
 /** Pulsing placeholder block for skeleton loading. */
 export function Skeleton({ height = 16, width = '100%', style }: { height?: number; width?: number | `${number}%`; style?: StyleProp<ViewStyle> }) {
+  const { C } = useTheme();
   const o = useSharedValue(0.5);
   useEffect(() => {
     o.value = withRepeat(withTiming(1, { duration: 700 }), -1, true);
@@ -570,8 +585,9 @@ export function Skeleton({ height = 16, width = '100%', style }: { height?: numb
   return <Animated.View style={[{ height, width, borderRadius: 8, backgroundColor: C.surfaceAlt }, a, style]} />;
 }
 
-export const st = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: C.bg },
+const useSt = makeStyles((t: Theme) =>
+  StyleSheet.create({
+  screen: { flex: 1, backgroundColor: t.C.bg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -583,20 +599,17 @@ export const st = StyleSheet.create({
   },
   body: { paddingHorizontal: space.xl, paddingTop: space.sm, paddingBottom: 32, gap: space.md },
   footer: {
+    ...glassTier(t, 'strong', 0),
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    borderBottomWidth: 0,
     paddingHorizontal: space.xl,
     paddingTop: space.md,
     paddingBottom: space.md,
-    backgroundColor: C.bg,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: C.border,
   },
   card: {
-    backgroundColor: C.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: C.border,
+    ...glassTier(t, 'primary', radius.lg),
     padding: space.lg,
-    ...elevation,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -616,20 +629,50 @@ export const st = StyleSheet.create({
   },
   btnCompact: { minHeight: 40, borderRadius: radius.sm },
   glassBtn: {
+    ...backdropBlur(20),
     minHeight: 50,
     borderRadius: 14,
     gap: 12,
-    borderWidth: 1.5,
-    borderColor: 'rgba(210, 228, 255, 0.95)',
-    boxShadow:
-      'inset 0px 1.5px 0px rgba(255, 255, 255, 0.55), 0px 0px 0px 1px rgba(255, 255, 255, 0.65), 0px 0px 18px rgba(80, 140, 255, 0.55), 0px 8px 18px rgba(28, 72, 176, 0.3)',
+    borderWidth: 1,
+    borderColor: t.G.buttonBorder,
+    boxShadow: t.G.buttonGlow,
   },
+  // Save-Payment look: warm gold rim, soft gold halo and drop shadow instead of the white glass rim.
+  goldBtn: {
+    minHeight: 54,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: t.dark ? 'rgba(240, 210, 140, 0.45)' : 'rgba(255, 234, 170, 0.95)',
+    boxShadow: t.dark
+      ? 'inset 0px 1px 0px rgba(255, 240, 200, 0.25), 0px 6px 18px rgba(0, 0, 0, 0.45)'
+      : 'inset 0px 1px 0px rgba(255, 245, 215, 0.6), 0px 0px 10px rgba(236, 196, 104, 0.35), 0px 8px 22px rgba(184, 134, 44, 0.28)',
+  },
+  goldBtnIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.45)',
+    boxShadow: 'inset 0px 1px 0px rgba(255, 255, 255, 0.35)',
+  },
+  goldBtnText: { fontSize: 16.5, lineHeight: 22, letterSpacing: 0.1 },
   glassGhost: {
-    ...glassSurface('rgba(255, 255, 255, 0.78)', 12, 'rgba(31, 58, 112, 0.06)'),
+    ...glassSurface(t, t.frost(0.78), 12),
     minHeight: 46,
     borderWidth: 1,
   },
-  glassBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 15.5, lineHeight: 20, color: '#FFFFFF' },
+  glassBtnText: {
+    fontFamily: F.semibold,
+    fontSize: 15,
+    lineHeight: 20,
+    color: t.G.onBlue,
+    textShadowColor: 'rgba(90, 60, 10, 0.25)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
   iconBtn: { alignItems: 'center', justifyContent: 'center' },
   dotBadge: {
     position: 'absolute',
@@ -638,18 +681,19 @@ export const st = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: C.danger,
+    backgroundColor: t.C.danger,
     borderWidth: 1.5,
-    borderColor: C.surface,
+    borderColor: t.C.surface,
   },
   state: { alignItems: 'center', gap: 8, paddingVertical: 40, paddingHorizontal: 24 },
   stateIcon: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: C.primarySoft,
+    backgroundColor: t.C.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
   },
-});
+}),
+);

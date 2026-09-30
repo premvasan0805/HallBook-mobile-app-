@@ -9,7 +9,8 @@ import { BottomSheet, useToast } from '@/components/overlays';
 import { PrimaryButton } from '@/components/primitives';
 import { fmtLong, inr, parseISO, toNum, todayISO } from '@/lib/format';
 import { balanceOf, paidOf, useStore, type Booking, type Customer } from '@/lib/store';
-import { F, G } from '@/lib/theme';
+import { F, type Theme } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/lib/theme-context';
 
 const METHODS = ['Cash', 'UPI', 'Card', 'Bank transfer', 'Cheque'];
 
@@ -23,13 +24,13 @@ function UpiMark() {
   );
 }
 
-const METHOD_GLYPH: Record<string, (on: boolean) => ReactNode> = {
-  Cash: (on) => <MaterialCommunityIcons name="cash" size={20} color={on ? '#FFFFFF' : G.navy} />,
+const methodGlyph = (t: Theme): Record<string, (on: boolean) => ReactNode> => ({
+  Cash: (on) => <MaterialCommunityIcons name="cash" size={20} color={on ? t.G.onBlue : t.G.navy} />,
   UPI: () => <UpiMark />,
-  Card: (on) => <Ionicons name="card-outline" size={18} color={on ? '#FFFFFF' : G.navy} />,
-  'Bank transfer': (on) => <MaterialCommunityIcons name="bank-outline" size={19} color={on ? '#FFFFFF' : G.navy} />,
-  Cheque: (on) => <MaterialCommunityIcons name="checkbook" size={19} color={on ? '#FFFFFF' : G.navy} />,
-};
+  Card: (on) => <Ionicons name="card-outline" size={18} color={on ? t.G.onBlue : t.G.navy} />,
+  'Bank transfer': (on) => <MaterialCommunityIcons name="bank-outline" size={19} color={on ? t.G.onBlue : t.G.navy} />,
+  Cheque: (on) => <MaterialCommunityIcons name="checkbook" size={19} color={on ? t.G.onBlue : t.G.navy} />,
+});
 
 /** One cell of the payment summary: glossy tinted disc, label and amount. */
 function SummaryCell({
@@ -45,6 +46,7 @@ function SummaryCell({
   value: number;
   color: string;
 }) {
+  const st = useSt();
   return (
     <View style={st.cell}>
       <GlossTile from={tone.from} to={tone.to} radius={15} style={st.cellIcon}>
@@ -75,6 +77,8 @@ export function RecordPaymentSheet({
 }) {
   const { addPayment } = useStore();
   const toast = useToast();
+  const t = useTheme();
+  const st = useSt();
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(todayISO());
   const [method, setMethod] = useState('Cash');
@@ -85,6 +89,7 @@ export function RecordPaymentSheet({
   if (!booking) return null;
   const due = balanceOf(booking);
   const value = toNum(amount);
+  const half = Math.round(due / 2);
   const dateOk = ISO_RE.test(date) && !isNaN(parseISO(date).getTime());
   const amountError = value > due ? `Cannot exceed remaining due of ${inr(due)}` : undefined;
   const valid = value > 0 && !amountError && dateOk;
@@ -123,30 +128,30 @@ export function RecordPaymentSheet({
       title="Record Payment"
       subtitle={booking.number}
       footer={<PrimaryButton title="Save Payment" icon="checkmark" disabled={!valid} loading={saving} onPress={save} />}>
-      <View style={[st.summary, glassSurface('rgba(255, 255, 255, 0.55)', 16)]}>
+      <View style={[st.summary, glassSurface(t, t.frost(0.55), 16)]}>
         <Sheen radius={16} strength={0.5} />
         <SummaryCell
-          icon={<Ionicons name="document-text-outline" size={17} color={G.blue} />}
-          tone={{ from: '#F4F8FF', to: '#D6E4FA' }}
+          icon={<Ionicons name="document-text-outline" size={17} color={t.G.blue} />}
+          tone={t.tone.blue}
           label="Booking total"
           value={booking.total}
-          color={G.ink}
+          color={t.G.ink}
         />
         <View style={st.sep} />
         <SummaryCell
-          icon={<Ionicons name="checkmark-circle" size={20} color="#138A55" />}
-          tone={{ from: '#F0FBF5', to: '#C9EEDB' }}
+          icon={<Ionicons name="checkmark-circle" size={20} color={t.C.success} />}
+          tone={t.tone.mint}
           label="Received"
           value={paidOf(booking)}
-          color="#138A55"
+          color={t.C.success}
         />
         <View style={st.sep} />
         <SummaryCell
-          icon={<MaterialCommunityIcons name="wallet-outline" size={18} color="#B0612A" />}
-          tone={{ from: '#FFF6EE', to: '#F8DEC8' }}
+          icon={<MaterialCommunityIcons name="wallet-outline" size={18} color={t.tone.peach.fg} />}
+          tone={t.tone.peach}
           label="Remaining"
           value={due}
-          color="#A8650F"
+          color={t.C.warning}
         />
       </View>
       <TextField
@@ -161,10 +166,10 @@ export function RecordPaymentSheet({
       />
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <View style={st.quick}>
-          <Chip label="Full due" highlight onPress={() => setAmount(String(due))} />
+          <Chip label="Full due" highlight={value > 0 && value === due} onPress={() => setAmount(String(due))} />
         </View>
         <View style={st.quick}>
-          <Chip label="Half" onPress={() => setAmount(String(Math.round(due / 2)))} />
+          <Chip label="Half" highlight={value > 0 && value === half} onPress={() => setAmount(String(half))} />
         </View>
       </View>
       <TextField
@@ -172,15 +177,15 @@ export function RecordPaymentSheet({
         placeholder="YYYY-MM-DD"
         value={date}
         onChangeText={setDate}
-        icon={<MaterialCommunityIcons name="calendar-month-outline" size={20} color={G.navy} />}
-        right={<MaterialCommunityIcons name="calendar-blank-outline" size={19} color={G.muted} />}
+        icon={<MaterialCommunityIcons name="calendar-month-outline" size={20} color={t.G.navy} />}
+        right={<MaterialCommunityIcons name="calendar-blank-outline" size={19} color={t.G.muted} />}
         error={date && !dateOk ? 'Use YYYY-MM-DD' : undefined}
       />
       <View style={{ gap: 8 }}>
         <Text style={st.label}>Payment method</Text>
         <View style={st.wrap}>
           {METHODS.map((m) => (
-            <Chip key={m} label={m} glyph={METHOD_GLYPH[m]} active={method === m} onPress={() => setMethod(m)} />
+            <Chip key={m} label={m} glyph={methodGlyph(t)[m]} active={method === m} onPress={() => setMethod(m)} />
           ))}
         </View>
       </View>
@@ -189,7 +194,7 @@ export function RecordPaymentSheet({
         placeholder="UPI / cheque / txn no."
         value={reference}
         onChangeText={setReference}
-        icon={<Ionicons name="document-text-outline" size={19} color={G.navy} />}
+        icon={<Ionicons name="document-text-outline" size={19} color={t.G.navy} />}
       />
       <TextField
         label="Notes (optional)"
@@ -197,7 +202,7 @@ export function RecordPaymentSheet({
         multiline
         value={notes}
         onChangeText={setNotes}
-        icon={<Ionicons name="document-text-outline" size={19} color={G.navy} />}
+        icon={<Ionicons name="document-text-outline" size={19} color={t.G.navy} />}
       />
     </BottomSheet>
   );
@@ -284,14 +289,16 @@ export function CustomerFormSheet({
   );
 }
 
-const st = StyleSheet.create({
-  summary: { flexDirection: 'row', paddingVertical: 12, paddingHorizontal: 8 },
-  cell: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingHorizontal: 4 },
-  cellIcon: { width: 30, height: 30 },
-  cellLabel: { fontFamily: F.regular, fontSize: 11, lineHeight: 14, color: G.ink },
-  cellValue: { fontFamily: F.bold, fontSize: 14.5, lineHeight: 20, marginTop: 5, letterSpacing: -0.3 },
-  sep: { width: 1, marginVertical: 2, backgroundColor: G.rule },
-  label: { fontFamily: F.medium, fontSize: 12.5, color: G.ink },
-  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
-  quick: { minWidth: 84 },
-});
+const useSt = makeStyles((t) =>
+  StyleSheet.create({
+    summary: { flexDirection: 'row', paddingVertical: 12, paddingHorizontal: 8 },
+    cell: { flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingHorizontal: 4 },
+    cellIcon: { width: 30, height: 30 },
+    cellLabel: { fontFamily: F.medium, fontSize: 11, lineHeight: 14, letterSpacing: 0.2, color: t.G.ink },
+    cellValue: { fontFamily: F.semibold, fontSize: 15, lineHeight: 20, marginTop: 5, letterSpacing: -0.2 },
+    sep: { width: 1, marginVertical: 2, backgroundColor: t.G.rule },
+    label: { fontFamily: F.medium, fontSize: 12, color: t.G.ink },
+    wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
+    quick: { minWidth: 84 },
+  }),
+);

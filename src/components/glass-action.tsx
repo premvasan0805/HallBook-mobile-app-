@@ -1,14 +1,16 @@
 import { useId } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import Svg, { Circle, Defs, Ellipse, G as SvgG, Line, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, G as SvgG, Line, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 
+import { backdropBlur } from '@/components/glass';
 import { Touchable } from '@/components/primitives';
-import { F } from '@/lib/theme';
+import { F, type Theme } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/lib/theme-context';
 
 /**
- * Wide glass call-to-action bar: glossy blue (`blue`) or frosted white (`frost`), a bright white rim with halo,
- * soft light ribbons sweeping across both ends, an optional lotus line-drawing at the right end, and a
- * glass plus-orb or calendar glyph beside a serif label. Every measurement derives from `height`.
+ * Wide glass call-to-action bar: soft muted-blue glass (`blue`) or frosted (`frost`), a thin light rim,
+ * faint light ribbons sweeping across both ends, an optional lotus line-drawing at the right end, and a
+ * glass plus-orb or calendar glyph beside a label. Every measurement derives from `height`.
  */
 export function GlassActionButton({
   title,
@@ -34,6 +36,8 @@ export function GlassActionButton({
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
 }) {
+  const t = useTheme();
+  const st = useSt();
   if (variant === 'royal') {
     return (
       <RoyalButton title={title} onPress={onPress} height={height} disabled={disabled} loading={loading} accessibilityLabel={accessibilityLabel} style={style} />
@@ -41,7 +45,7 @@ export function GlassActionButton({
   }
   const blue = variant === 'blue';
   const r = Math.round(height * 0.27);
-  const ink = blue ? '#FFFFFF' : '#0E1B4F';
+  const ink = blue ? t.G.onBlue : t.G.ink;
   const off = disabled || loading;
 
   return (
@@ -74,12 +78,12 @@ export function GlassActionButton({
           <Text
             numberOfLines={1}
             style={{
-              fontFamily: F.pageSerifBold,
-              fontSize: height * 0.36,
-              lineHeight: height * 0.46,
+              fontFamily: F.semibold,
+              fontSize: height * 0.28,
+              lineHeight: height * 0.38,
               color: ink,
               letterSpacing: 0.1,
-              textShadowColor: blue ? 'rgba(14, 40, 110, 0.35)' : 'transparent',
+              textShadowColor: blue ? (t.dark ? 'rgba(0, 0, 0, 0.25)' : 'rgba(30, 30, 30, 0.18)') : 'transparent',
               textShadowOffset: { width: 0, height: 1 },
               textShadowRadius: blue ? 3 : 0,
             }}>
@@ -95,39 +99,50 @@ function useSvgId(prefix: string) {
   return prefix + useId().replace(/[^a-zA-Z0-9]/g, '');
 }
 
-type StopSpec = [offset: string, color: string, opacity: number];
-const BLUE_STOPS: StopSpec[] = [
-  ['0', '#8DBBF6', 1],
-  ['0.14', '#5E93EA', 1],
-  ['0.42', '#3469D4', 1],
-  ['0.62', '#2C5FCB', 1],
-  ['0.86', '#4A80E0', 1],
-  ['1', '#86B2F2', 1],
-];
-const FROST_STOPS: StopSpec[] = [
-  ['0', '#FFFFFF', 0.78],
-  ['0.5', '#F4F7FE', 0.62],
-  ['1', '#E6EEFC', 0.72],
-];
+/** Highlight multiplier: light trails and sheens stay faint, fainter still in dark mode. */
+const glint = (t: Theme) => (t.dark ? 0.5 : 0.8);
 
-/** Fill: blue is bright at both ends and deep through the middle; frost is milky white with a cool tint. A top sheen and bottom glow sit over both. */
+type StopSpec = [offset: string, color: string, opacity: number];
+/** Gold glass: slightly lighter at both ends, settling into the deeper tone through the middle. */
+const blueStops = (t: Theme): StopSpec[] => [
+  ['0', t.G.gradFrom, 0.84],
+  ['0.42', t.G.gradTo, 0.76],
+  ['0.62', t.G.gradTo, 0.76],
+  ['1', t.G.gradFrom, 0.84],
+];
+const frostStops = (t: Theme): StopSpec[] =>
+  t.dark
+    ? [
+        ['0', t.highlight, 0.09],
+        ['0.5', t.highlight, 0.06],
+        ['1', t.C.primary, 0.08],
+      ]
+    : [
+        ['0', t.highlight, 0.78],
+        ['0.5', t.background, 0.62],
+        ['1', t.C.primarySoft, 0.72],
+      ];
+
+/** Fill: blue is lighter at both ends and deeper through the middle; frost is milky with a cool tint. A faint top wash sits over both. */
 function Body({ blue, r }: { blue: boolean; r: number }) {
+  const t = useTheme();
   const h = useSvgId('gab');
   const v = useSvgId('gav');
+  const k = glint(t);
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: r, overflow: 'hidden' }]}>
       <Svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
         <Defs>
           <LinearGradient id={h} x1="0" y1="0" x2="1" y2="0">
-            {(blue ? BLUE_STOPS : FROST_STOPS).map(([offset, color, opacity]) => (
+            {(blue ? blueStops(t) : frostStops(t)).map(([offset, color, opacity]) => (
               <Stop key={offset} offset={offset} stopColor={color} stopOpacity={opacity} />
             ))}
           </LinearGradient>
           <LinearGradient id={v} x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#FFFFFF" stopOpacity={blue ? 0.3 : 0.7} />
-            <Stop offset="0.42" stopColor="#FFFFFF" stopOpacity={0} />
-            <Stop offset="0.8" stopColor="#FFFFFF" stopOpacity={0} />
-            <Stop offset="1" stopColor="#FFFFFF" stopOpacity={blue ? 0.2 : 0.5} />
+            <Stop offset="0" stopColor={t.highlight} stopOpacity={(blue ? 0.18 : 0.5) * k} />
+            <Stop offset="0.42" stopColor={t.highlight} stopOpacity={0} />
+            <Stop offset="0.8" stopColor={t.highlight} stopOpacity={0} />
+            <Stop offset="1" stopColor={t.highlight} stopOpacity={(blue ? 0.06 : 0.2) * k} />
           </LinearGradient>
         </Defs>
         <Rect width={100} height={100} fill={`url(#${h})`} />
@@ -139,21 +154,23 @@ function Body({ blue, r }: { blue: boolean; r: number }) {
 
 /** Translucent light ribbons: one falling from the upper left, one rising to the upper right. */
 function Ribbons({ blue, r }: { blue: boolean; r: number }) {
-  const band = blue ? '#FFFFFF' : '#9DB8EC';
-  const line = blue ? '#FFFFFF' : '#86A6E4';
+  const t = useTheme();
+  const k = glint(t);
+  const band = blue ? t.highlight : t.C.primaryMuted;
+  const line = blue ? t.highlight : t.secondary;
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: r, overflow: 'hidden' }]}>
       <Svg width="100%" height="100%" viewBox="0 0 400 60" preserveAspectRatio="none">
         {/* Left ribbon */}
-        <Path d="M0 30C28 30 52 38 78 50S112 60 124 60H0Z" fill={band} fillOpacity={blue ? 0.1 : 0.12} />
-        <Path d="M0 30C28 30 52 38 78 50S112 60 124 60" stroke={line} strokeOpacity={blue ? 0.45 : 0.4} strokeWidth={0.9} fill="none" />
-        <Path d="M12 8C38 20 62 34 88 48S120 62 132 64" stroke={line} strokeOpacity={blue ? 0.22 : 0.2} strokeWidth={0.7} fill="none" />
-        <Path d="M0 44C24 42 44 48 62 56" stroke={line} strokeOpacity={blue ? 0.3 : 0.25} strokeWidth={0.7} fill="none" />
+        <Path d="M0 30C28 30 52 38 78 50S112 60 124 60H0Z" fill={band} fillOpacity={(blue ? 0.08 : 0.12) * k} />
+        <Path d="M0 30C28 30 52 38 78 50S112 60 124 60" stroke={line} strokeOpacity={(blue ? 0.32 : 0.4) * k} strokeWidth={0.9} fill="none" />
+        <Path d="M12 8C38 20 62 34 88 48S120 62 132 64" stroke={line} strokeOpacity={(blue ? 0.16 : 0.2) * k} strokeWidth={0.7} fill="none" />
+        <Path d="M0 44C24 42 44 48 62 56" stroke={line} strokeOpacity={(blue ? 0.22 : 0.25) * k} strokeWidth={0.7} fill="none" />
         {/* Right ribbon */}
-        <Path d="M232 60C278 58 318 42 346 20S384 0 400 0V60Z" fill={band} fillOpacity={blue ? 0.1 : 0.14} />
-        <Path d="M232 60C278 58 318 42 346 20S384 0 400 0" stroke={line} strokeOpacity={blue ? 0.5 : 0.45} strokeWidth={0.9} fill="none" />
-        <Path d="M262 60C300 56 330 44 354 30S388 14 404 12" stroke={line} strokeOpacity={blue ? 0.28 : 0.24} strokeWidth={0.7} fill="none" />
-        <Path d="M300 60C330 54 356 46 376 36" stroke={line} strokeOpacity={blue ? 0.2 : 0.18} strokeWidth={0.7} fill="none" />
+        <Path d="M232 60C278 58 318 42 346 20S384 0 400 0V60Z" fill={band} fillOpacity={(blue ? 0.08 : 0.14) * k} />
+        <Path d="M232 60C278 58 318 42 346 20S384 0 400 0" stroke={line} strokeOpacity={(blue ? 0.36 : 0.45) * k} strokeWidth={0.9} fill="none" />
+        <Path d="M262 60C300 56 330 44 354 30S388 14 404 12" stroke={line} strokeOpacity={(blue ? 0.2 : 0.24) * k} strokeWidth={0.7} fill="none" />
+        <Path d="M300 60C330 54 356 46 376 36" stroke={line} strokeOpacity={(blue ? 0.14 : 0.18) * k} strokeWidth={0.7} fill="none" />
       </Svg>
     </View>
   );
@@ -161,8 +178,9 @@ function Ribbons({ blue, r }: { blue: boolean; r: number }) {
 
 /** Lotus line-art anchored to the bottom-right corner, with a spray of dots and fine stems. */
 function Lotus({ blue, height }: { blue: boolean; height: number }) {
-  const c = blue ? '#FFFFFF' : '#7F9FE0';
-  const o = blue ? 0.42 : 0.5;
+  const t = useTheme();
+  const c = blue ? t.highlight : t.secondary;
+  const o = (blue ? 0.42 : 0.5) * (t.dark ? 0.6 : 0.9);
   const w = height * 1.35;
   return (
     <View pointerEvents="none" style={{ position: 'absolute', right: height * 0.04, bottom: 0, width: w, height: height * 0.98 }}>
@@ -197,10 +215,12 @@ function Lotus({ blue, height }: { blue: boolean; height: number }) {
   );
 }
 
-/** Glass disc with a bright rim and a thick rounded plus. */
+/** Subtle glass disc with a thin rim and a thick rounded plus. */
 function PlusOrb({ blue, size }: { blue: boolean; size: number }) {
+  const t = useTheme();
   const s = size * 0.46;
   const sw = size * 0.085;
+  const plus = blue ? t.G.onBlue : t.G.blue;
   return (
     <View
       style={{
@@ -210,15 +230,17 @@ function PlusOrb({ blue, size }: { blue: boolean; size: number }) {
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        backgroundColor: blue ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.55)',
-        borderColor: blue ? 'rgba(255, 255, 255, 0.4)' : 'rgba(170, 196, 240, 0.9)',
-        boxShadow: blue
-          ? 'inset 0px 1px 0px rgba(255, 255, 255, 0.45), inset 0px -4px 10px rgba(20, 60, 160, 0.25), 0px 2px 6px rgba(14, 40, 110, 0.2)'
-          : 'inset 0px 1.5px 0px rgba(255, 255, 255, 1), inset 0px 0px 8px rgba(255, 255, 255, 0.9), 0px 0px 6px rgba(255, 255, 255, 0.9), 0px 2px 6px rgba(31, 58, 112, 0.1)',
+        backgroundColor: blue ? (t.dark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(255, 255, 255, 0.12)') : t.frost(0.55),
+        borderColor: blue ? t.G.buttonBorder : t.lightBlue,
+        boxShadow: t.dark
+          ? `inset 0px 1px 0px rgba(255, 255, 255, 0.06), 0px 2px 6px ${t.shadow}`
+          : blue
+            ? 'inset 0px 1px 0px rgba(255, 255, 255, 0.3), 0px 1px 4px rgba(30, 30, 30, 0.1)'
+            : `inset 0px 1px 0px rgba(255, 255, 255, 0.9), 0px 2px 6px ${t.shadow}`,
       }}>
       <Svg width={s} height={s} viewBox="0 0 20 20">
-        <Line x1={10} y1={1.5} x2={10} y2={18.5} stroke={blue ? '#FFFFFF' : '#1F55C8'} strokeWidth={(sw / s) * 20} strokeLinecap="round" />
-        <Line x1={1.5} y1={10} x2={18.5} y2={10} stroke={blue ? '#FFFFFF' : '#1F55C8'} strokeWidth={(sw / s) * 20} strokeLinecap="round" />
+        <Line x1={10} y1={1.5} x2={10} y2={18.5} stroke={plus} strokeWidth={(sw / s) * 20} strokeLinecap="round" />
+        <Line x1={1.5} y1={10} x2={18.5} y2={10} stroke={plus} strokeWidth={(sw / s) * 20} strokeLinecap="round" />
       </Svg>
     </View>
   );
@@ -241,22 +263,17 @@ function CalendarGlyph({ color, size }: { color: string; size: number }) {
 
 // ---------- Royal: Home's Add Booking ----------
 
-/** Pale glassy ends running into a medium blue under the label. */
-const ROYAL_STOPS: StopSpec[] = [
-  ['0', '#B4CFF8', 1],
-  ['0.1', '#93B8F4', 1],
-  ['0.26', '#6696EE', 1],
-  ['0.42', '#4A7FE8', 1],
-  ['0.56', '#4377E4', 1],
-  ['0.72', '#5A8DEC', 1],
-  ['0.9', '#90B6F4', 1],
-  ['1', '#B4CFF8', 1],
+/** Gold light caught in glass: brighter translucent gold at the top-left fading to a clearer pane (135°). */
+const royalStops = (t: Theme): StopSpec[] => [
+  ['0', '#D6AA45', t.dark ? 0.5 : 0.62],
+  ['0.55', '#C69224', t.dark ? 0.36 : 0.46],
+  ['1', '#C69224', t.dark ? 0.26 : 0.34],
 ];
 
 /**
- * Blue glass capsule: pale glassy ends deepening to medium blue under the label, a thin bright white rim with
- * a soft pale halo, a faint inner bezel, two sweeping light waves (left one falling, right one rising) and a
- * clear glass bubble holding a thick white plus, beside a bold sans label.
+ * Gold-lit glass capsule (Home's Add Booking): translucent gold over a live backdrop blur, a thin light rim,
+ * a faint inner bezel, two sweeping light waves (left one falling, right one rising) and a subtle glass
+ * bubble holding a thick plus, beside a bold sans label.
  */
 function RoyalButton({
   title,
@@ -275,6 +292,8 @@ function RoyalButton({
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
 }) {
+  const t = useTheme();
+  const st = useSt();
   const r = height * 0.38;
   const bezel = Math.max(3, height * 0.055);
   const off = disabled || loading;
@@ -298,25 +317,25 @@ function RoyalButton({
           bottom: bezel,
           borderRadius: r - bezel,
           borderWidth: 1,
-          borderColor: 'rgba(255, 255, 255, 0.16)',
-          borderTopColor: 'rgba(255, 255, 255, 0.3)',
-          borderLeftColor: 'rgba(255, 255, 255, 0.28)',
+          borderColor: t.dark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(255, 255, 255, 0.1)',
+          borderTopColor: t.dark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.2)',
+          borderLeftColor: t.dark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(255, 255, 255, 0.18)',
         }}
       />
       {loading ? (
-        <ActivityIndicator color="#FFFFFF" />
+        <ActivityIndicator color={t.G.onBlue} />
       ) : (
         <>
           <Bubble size={height * 0.56} />
           <Text
             numberOfLines={1}
             style={{
-              fontFamily: F.latoBold,
-              fontSize: height * 0.36,
-              lineHeight: height * 0.46,
-              color: '#FFFFFF',
-              letterSpacing: 0.2,
-              textShadowColor: 'rgba(20, 50, 140, 0.35)',
+              fontFamily: F.semibold,
+              fontSize: height * 0.28,
+              lineHeight: height * 0.38,
+              color: t.G.onBlue,
+              letterSpacing: 0.1,
+              textShadowColor: t.dark ? 'rgba(0, 0, 0, 0.35)' : 'rgba(110, 72, 8, 0.35)',
               textShadowOffset: { width: 0, height: 1.5 },
               textShadowRadius: 3,
             }}>
@@ -328,34 +347,30 @@ function RoyalButton({
   );
 }
 
-/** Body gradient, a deeper glow behind the label and a white wash along the top and bottom rims. */
+/** Body gradient, a slightly deeper tone behind the label and a faint light wash along the top and bottom rims. */
 function RoyalBody({ r }: { r: number }) {
+  const t = useTheme();
   const h = useSvgId('grb');
-  const core = useSvgId('grc');
   const v = useSvgId('grv');
+  const k = t.dark ? 0.35 : 0.6;
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: r, overflow: 'hidden' }]}>
       <Svg width="100%" height="100%" viewBox="0 0 400 60" preserveAspectRatio="none">
         <Defs>
-          <LinearGradient id={h} x1="0" y1="0" x2="1" y2="0">
-            {ROYAL_STOPS.map(([offset, color, opacity]) => (
+          <LinearGradient id={h} x1="0" y1="0" x2="1" y2="1">
+            {royalStops(t).map(([offset, color, opacity]) => (
               <Stop key={offset} offset={offset} stopColor={color} stopOpacity={opacity} />
             ))}
           </LinearGradient>
-          <RadialGradient id={core} cx="0.52" cy="0.5" r="0.5">
-            <Stop offset="0" stopColor="#3A6FE0" stopOpacity={0.45} />
-            <Stop offset="1" stopColor="#3A6FE0" stopOpacity={0} />
-          </RadialGradient>
           <LinearGradient id={v} x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.42} />
-            <Stop offset="0.18" stopColor="#FFFFFF" stopOpacity={0.1} />
-            <Stop offset="0.5" stopColor="#FFFFFF" stopOpacity={0} />
-            <Stop offset="0.86" stopColor="#FFFFFF" stopOpacity={0.04} />
-            <Stop offset="1" stopColor="#FFFFFF" stopOpacity={0.22} />
+            <Stop offset="0" stopColor={t.highlight} stopOpacity={0.42 * k} />
+            <Stop offset="0.18" stopColor={t.highlight} stopOpacity={0.1 * k} />
+            <Stop offset="0.5" stopColor={t.highlight} stopOpacity={0} />
+            <Stop offset="0.86" stopColor={t.highlight} stopOpacity={0.02 * k} />
+            <Stop offset="1" stopColor={t.highlight} stopOpacity={0.1 * k} />
           </LinearGradient>
         </Defs>
         <Rect width={400} height={60} fill={`url(#${h})`} />
-        <Ellipse cx={210} cy={30} rx={150} ry={34} fill={`url(#${core})`} />
         <Rect width={400} height={60} fill={`url(#${v})`} />
       </Svg>
     </View>
@@ -364,33 +379,37 @@ function RoyalBody({ r }: { r: number }) {
 
 /** Two light waves: one from the left rim dipping to the lower middle, one rising from the lower middle to the right rim. */
 function RoyalWaves({ r }: { r: number }) {
+  const t = useTheme();
   const band = useSvgId('grw');
+  const k = glint(t);
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: r, overflow: 'hidden' }]}>
       <Svg width="100%" height="100%" viewBox="0 0 400 60" preserveAspectRatio="none">
         <Defs>
           <LinearGradient id={band} x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.14} />
-            <Stop offset="1" stopColor="#FFFFFF" stopOpacity={0.26} />
+            <Stop offset="0" stopColor={t.highlight} stopOpacity={0.1 * k} />
+            <Stop offset="1" stopColor={t.highlight} stopOpacity={0.18 * k} />
           </LinearGradient>
         </Defs>
         {/* Left wave: level from the rim, then falling to the bottom edge. */}
         <Path d="M0 28C30 26 60 28 88 36S140 58 186 60H0Z" fill={`url(#${band})`} />
-        <Path d="M0 28C30 26 60 28 88 36S140 58 186 60" stroke="#FFFFFF" strokeOpacity={0.55} strokeWidth={0.8} fill="none" />
-        <Path d="M0 36C26 34 52 38 76 46S112 60 140 62" stroke="#FFFFFF" strokeOpacity={0.18} strokeWidth={0.5} fill="none" />
+        <Path d="M0 28C30 26 60 28 88 36S140 58 186 60" stroke={t.highlight} strokeOpacity={0.4 * k} strokeWidth={0.8} fill="none" />
+        <Path d="M0 36C26 34 52 38 76 46S112 60 140 62" stroke={t.highlight} strokeOpacity={0.14 * k} strokeWidth={0.5} fill="none" />
         {/* Right wave: rising from the lower middle to the right rim. */}
         <Path d="M228 60C282 60 320 48 348 38S384 28 400 28V60Z" fill={`url(#${band})`} />
-        <Path d="M228 60C282 60 320 48 348 38S384 28 400 28" stroke="#FFFFFF" strokeOpacity={0.55} strokeWidth={0.8} fill="none" />
-        <Path d="M262 62C306 58 336 50 360 44S390 38 402 38" stroke="#FFFFFF" strokeOpacity={0.18} strokeWidth={0.5} fill="none" />
+        <Path d="M228 60C282 60 320 48 348 38S384 28 400 28" stroke={t.highlight} strokeOpacity={0.4 * k} strokeWidth={0.8} fill="none" />
+        <Path d="M262 62C306 58 336 50 360 44S390 38 402 38" stroke={t.highlight} strokeOpacity={0.14 * k} strokeWidth={0.5} fill="none" />
       </Svg>
     </View>
   );
 }
 
-/** Clear glass bubble: thin bright rim, lighter blue interior, a small specular arc and a thick white plus. */
+/** Subtle glass bubble: thin light rim, faintly lighter interior, a small soft arc and a thick plus. */
 function Bubble({ size }: { size: number }) {
+  const t = useTheme();
   const fill = useSvgId('gbf');
   const s = size * 0.5;
+  const k = glint(t);
   return (
     <View
       style={{
@@ -399,27 +418,28 @@ function Bubble({ size }: { size: number }) {
         borderRadius: size / 2,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1.5,
-        borderColor: 'rgba(240, 248, 255, 0.85)',
-        boxShadow:
-          'inset 0px 0px 8px rgba(255, 255, 255, 0.4), 0px 0px 6px rgba(200, 225, 255, 0.45), 0px 2px 6px rgba(20, 50, 140, 0.18)',
+        borderWidth: 1,
+        borderColor: t.G.buttonBorder,
+        boxShadow: t.dark
+          ? 'inset 0px 1px 0px rgba(255, 255, 255, 0.06), 0px 2px 6px rgba(0, 0, 0, 0.25)'
+          : 'inset 0px 1px 0px rgba(255, 255, 255, 0.3), 0px 1px 4px rgba(30, 30, 30, 0.1)',
       }}>
       <Svg style={StyleSheet.absoluteFill} viewBox="0 0 100 100">
         <Defs>
           <RadialGradient id={fill} cx="0.5" cy="0.55" r="0.55">
-            <Stop offset="0" stopColor="#7FAEF4" stopOpacity={0.35} />
-            <Stop offset="0.75" stopColor="#A9CBFA" stopOpacity={0.3} />
-            <Stop offset="1" stopColor="#FFFFFF" stopOpacity={0.45} />
+            <Stop offset="0" stopColor={t.highlight} stopOpacity={0.06 * k} />
+            <Stop offset="0.75" stopColor={t.highlight} stopOpacity={0.1 * k} />
+            <Stop offset="1" stopColor={t.highlight} stopOpacity={0.2 * k} />
           </RadialGradient>
         </Defs>
         <Circle cx={50} cy={50} r={49} fill={`url(#${fill})`} />
-        {/* Specular arc along the upper-left inside of the rim */}
-        <Path d="M18 38C22 24 34 14 48 11" stroke="#FFFFFF" strokeOpacity={0.6} strokeWidth={2.5} strokeLinecap="round" fill="none" />
+        {/* Soft arc along the upper-left inside of the rim */}
+        <Path d="M18 38C22 24 34 14 48 11" stroke={t.highlight} strokeOpacity={0.4 * k} strokeWidth={2.5} strokeLinecap="round" fill="none" />
       </Svg>
       {/* Wrapped so the plus stacks above the absolute bubble fill on web. */}
       <View>
         <Svg width={s} height={s} viewBox="0 0 20 20">
-          <SvgG stroke="#FFFFFF" strokeWidth={3.6} strokeLinecap="round">
+          <SvgG stroke={t.G.onBlue} strokeWidth={3.6} strokeLinecap="round">
             <Line x1={10} y1={2} x2={10} y2={18} />
             <Line x1={2} y1={10} x2={18} y2={10} />
           </SvgG>
@@ -429,27 +449,34 @@ function Bubble({ size }: { size: number }) {
   );
 }
 
-const st = StyleSheet.create({
-  royal: {
-    borderWidth: 2,
-    borderColor: 'rgba(245, 250, 255, 0.95)',
-    boxShadow:
-      'inset 0px 1.5px 0px rgba(255, 255, 255, 0.7), inset 0px 0px 14px rgba(220, 236, 255, 0.45), 0px 0px 0px 1px rgba(255, 255, 255, 0.35), 0px 0px 10px rgba(225, 238, 255, 0.9), 0px 0px 28px rgba(140, 185, 250, 0.45), 0px 8px 20px rgba(40, 90, 200, 0.14)',
-  },
-  base: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-  },
-  blue: {
-    borderColor: 'rgba(236, 244, 255, 0.95)',
-    boxShadow:
-      'inset 0px 1.5px 0px rgba(255, 255, 255, 0.6), inset 0px 0px 14px rgba(190, 220, 255, 0.35), 0px 0px 0px 1px rgba(255, 255, 255, 0.5), 0px 0px 8px rgba(255, 255, 255, 0.85), 0px 0px 22px rgba(110, 160, 255, 0.45), 0px 8px 18px rgba(28, 72, 176, 0.22)',
-  },
-  frost: {
-    borderColor: 'rgba(255, 255, 255, 0.98)',
-    boxShadow:
-      'inset 0px 2px 0px rgba(255, 255, 255, 1), inset 0px 0px 18px rgba(255, 255, 255, 0.85), 0px 0px 0px 1px rgba(200, 218, 250, 0.5), 0px 0px 8px rgba(255, 255, 255, 0.95), 0px 0px 22px rgba(255, 255, 255, 0.8), 0px 8px 18px rgba(31, 58, 112, 0.1)',
-  },
-});
+const useSt = makeStyles((t) =>
+  StyleSheet.create({
+    royal: {
+      borderWidth: 1,
+      borderColor: t.dark ? 'rgba(255, 255, 255, 0.24)' : 'rgba(255, 255, 255, 0.65)',
+      backgroundColor: t.dark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.12)',
+      boxShadow: t.dark
+        ? 'inset 0px 1px 0px rgba(255, 255, 255, 0.18), 0px 8px 24px rgba(0, 0, 0, 0.45)'
+        : 'inset 0px 1px 0px rgba(255, 255, 255, 0.6), 0px 8px 24px rgba(198, 146, 36, 0.20)',
+      ...backdropBlur(25),
+    },
+    base: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+    },
+    blue: {
+      borderColor: t.G.buttonBorder,
+      boxShadow: t.G.buttonGlow,
+      ...backdropBlur(22),
+    },
+    frost: {
+      ...backdropBlur(24),
+      borderColor: t.glassBorder,
+      boxShadow: t.dark
+        ? `inset 0px 1px 0px rgba(255, 255, 255, 0.06), 0px 8px 20px ${t.shadow}`
+        : `inset 0px 1px 0px rgba(255, 255, 255, 0.9), 0px 6px 16px ${t.shadow}`,
+    },
+  }),
+);

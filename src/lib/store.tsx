@@ -307,7 +307,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   ]);
   const [rates, setRates] = useState(INITIAL_RATES);
   const [eventTypes, setEventTypes] = useState(DEFAULT_EVENT_TYPES);
-  const [signedIn, setSignedIn] = useState(true);
+  // Every launch opens on the welcome intro; sign-in is local-only and not persisted.
+  const [signedIn, setSignedIn] = useState(false);
 
   const value = useMemo<Store>(() => {
     const typeMap = new Map<string, DateType[]>();

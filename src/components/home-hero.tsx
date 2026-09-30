@@ -1,83 +1,25 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useState } from 'react';
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import Svg, {
-  Circle,
-  ClipPath,
-  Defs,
-  Ellipse,
-  FeGaussianBlur,
-  Filter,
-  G,
-  LinearGradient,
-  Path,
-  RadialGradient,
-  Rect,
-  Stop,
-} from 'react-native-svg';
+import Svg, { Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 
+import { backdropBlur, GradientFill, glassTier, Sheen } from '@/components/glass';
 import { Touchable } from '@/components/primitives';
-import { appWidth, F } from '@/lib/theme';
+import { appWidth, F, type Theme } from '@/lib/theme';
+import { useTheme } from '@/lib/theme-context';
 
-/** Mandala and sparkles printed on the right of the bookings card. */
-const CARD_MANDALA = require('../../assets/images/home/hero-mandala.png');
+/** Banyan Meadows tree + wordmark (gold on transparent). */
+const LOGO = require('../../assets/images/brand/logo-mark.png');
+const LOGO_ASPECT = 360 / 377;
+const TAGLINE = '“A Space for Every Age, A Celebration for Every Stage”';
 
-/** The home header is laid out on a 1740×964 reference; `h(px)` converts a reference pixel to dp. */
-const REF_WIDTH = 1740;
-const REF_HEIGHT = 964;
+/** Home is designed at 430dp wide; `s(dp)` scales a design dp to the current width. */
+const DESIGN_WIDTH = 430;
 
-/** Bookings card, in reference px relative to its own top-left (placed at CARD_X, CARD_Y). */
-const CARD_X = 68;
-const CARD_Y = 544;
-const CARD_W = 1610;
-const CARD_H = 404;
-/** Where the top edge starts dropping, and where it lands DIP px lower to uncover the backdrop photo. */
-const DIP_FROM = 722;
-const DIP_TO = 1172;
-const DIP = 50;
-const R = 58;
-const CARD_SHAPE =
-  `M0 ${R}Q0 0 ${R} 0L${DIP_FROM} 0C812 0 932 ${DIP * 0.53} 1032 ${DIP * 0.78}C1092 ${DIP * 0.95} 1122 ${DIP} ${DIP_TO} ${DIP}` +
-  `L${CARD_W - R} ${DIP}Q${CARD_W} ${DIP} ${CARD_W} ${DIP + R}L${CARD_W} ${CARD_H - R}Q${CARD_W} ${CARD_H} ${CARD_W - R} ${CARD_H}` +
-  `L${R} ${CARD_H}Q0 ${CARD_H} 0 ${CARD_H - R}Z`;
-/** Room around the card path so its blurred glow is not clipped by the SVG viewport. */
-const GLOW_PAD = 70;
-
-/** Crest of the glass wave (header reference px): rises over the card's left half, dips into it, then climbs to the top-right. */
-const WAVE =
-  'M0 508C110 440 220 408 350 404C580 398 840 520 1060 588C1150 612 1230 610 1300 572C1460 490 1610 340 1740 256';
-/** Sparkles on the wave crest: [x, y, radius] in header reference px. */
-const SPARKS: [number, number, number][] = [
-  [40, 486, 16],
-  [350, 404, 9],
-  [1650, 318, 13],
-];
-/** Light flares caught on the card rim: [cx, cy, rx, ry] in card-local reference px. */
-const FLARES: [number, number, number, number][] = [
-  [40, CARD_H - 8, 150, 30],
-  [320, 0, 170, 14],
-  [780, CARD_H, 230, 18],
-  [1150, DIP - 1, 130, 12],
-  [CARD_W, CARD_H - 90, 14, 70],
-];
-
-/** True when a point (card-local reference px) is inside the card below its curved top edge. */
-function inCard(x: number, y: number) {
-  if (x < 0 || x > CARD_W || y > CARD_H) return false;
-  if (x <= DIP_FROM) return y >= 0;
-  if (x >= DIP_TO) return y >= DIP;
-  const t = (x - DIP_FROM) / (DIP_TO - DIP_FROM);
-  return y >= DIP * t * t * (3 - 2 * t);
-}
-
-/** Home's blue glass palette. */
-const INK = '#101A4C';
-const NAME = '#0B1462';
-const ROYAL = '#1D4FB4';
-const ON_CARD = '#F5F7FC';
-const RULE = 'rgba(255, 255, 255, 0.9)';
-
+/**
+ * Home header: Banyan Meadows logo, glass notification/profile orbs, the hall selector capsule and the frosted
+ * "Today's Bookings" panel. Everything is real glass over the blurred venue backdrop — the gold is only an accent.
+ */
 export function HomeHero({
   greeting,
   name,
@@ -106,392 +48,228 @@ export function HomeHero({
   initials: string;
 }) {
   const { width } = useWindowDimensions();
-  const h = (px: number) => (appWidth(width) / REF_WIDTH) * px;
-  const [pressed, setPressed] = useState(false);
-  const hit = (e: { nativeEvent: { locationX: number; locationY: number } }) =>
-    inCard(e.nativeEvent.locationX / h(1), e.nativeEvent.locationY / h(1));
+  const s = (dp: number) => (appWidth(width) / DESIGN_WIDTH) * dp;
+  const t = useTheme();
+  const INK = t.G.ink;
+  const GOLD = t.G.blue;
+  const pad = s(18);
+  const orb = s(46);
+  const logoH = s(96);
 
   return (
-    <View style={{ height: h(REF_HEIGHT), zIndex: 1 }}>
-      {/* Greeting, name and hall (the venue photo behind them is part of the page backdrop) */}
-      <Text style={[st.abs, { left: h(122), top: h(70), fontFamily: F.regular, fontSize: h(43), lineHeight: h(52), color: '#4B5163' }]}>
-        {greeting},
-      </Text>
-      <Text
-        numberOfLines={1}
-        style={[
-          st.abs,
-          { left: h(108), top: h(112), right: h(560), fontFamily: F.pageSerifBold, fontSize: h(128), lineHeight: h(150), color: NAME, letterSpacing: -h(1) },
-        ]}>
-        {name}
-      </Text>
+    <View style={{ paddingHorizontal: pad, paddingTop: s(6), zIndex: 1 }}>
+      {/* Logo + tagline, bell and avatar */}
+      <View style={st.row}>
+        <View
+          accessible
+          accessibilityRole="header"
+          accessibilityLabel={`The Banyan Meadows. ${greeting}, ${name}`}
+          style={{ flex: 1, alignItems: 'flex-start' }}>
+          <Image
+            source={LOGO}
+            contentFit="contain"
+            style={{ height: logoH, width: logoH * LOGO_ASPECT, marginLeft: s(22) }}
+          />
+          <Text
+            numberOfLines={1}
+            style={{
+              marginTop: s(3),
+              fontFamily: F.regular,
+              fontSize: Math.max(s(9.5), 9),
+              lineHeight: Math.max(s(13), 12),
+              color: t.dark ? t.G.navy : '#4B4640',
+              letterSpacing: 0.1,
+            }}>
+            {TAGLINE}
+          </Text>
+        </View>
+        <View style={[st.row, { gap: s(12), alignSelf: 'flex-start', marginTop: s(4) }]}>
+          <Touchable
+            onPress={onAlerts}
+            accessibilityLabel="Notifications"
+            style={[st.center, glassOrb(t, orb)]}>
+            <Ionicons name="notifications-outline" size={s(22)} color={INK} />
+            {hasAlerts ? (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: s(11),
+                  right: s(12),
+                  width: s(8),
+                  height: s(8),
+                  borderRadius: s(4),
+                  backgroundColor: t.C.danger,
+                  borderWidth: 1.5,
+                  borderColor: t.dark ? '#2A2622' : 'rgba(255, 255, 255, 0.95)',
+                }}
+              />
+            ) : null}
+          </Touchable>
+          <Touchable onPress={onProfile} accessibilityLabel="Profile" style={[st.center, glassOrb(t, orb)]}>
+            <Text style={{ fontFamily: F.semibold, fontSize: s(16), lineHeight: s(20), color: INK, letterSpacing: 0.2 }}>{initials}</Text>
+          </Touchable>
+        </View>
+      </View>
+
+      {/* Hall selector capsule */}
       <Touchable
         onPress={onHall}
         accessibilityLabel="Hall details"
-        style={[st.abs, st.row, { left: h(108), top: h(280), right: h(880), height: h(88), gap: h(30) }]}>
-        <View
-          style={[
-            st.center,
-            {
-              width: h(84),
-              height: h(84),
-              borderRadius: h(18),
-              backgroundColor: 'rgba(220, 231, 250, 0.92)',
-              boxShadow: `inset 0px ${h(2)}px 0px rgba(255,255,255,0.9), 0px ${h(4)}px ${h(10)}px rgba(31, 58, 112, 0.1)`,
-            },
-          ]}>
-          <MaterialCommunityIcons name="town-hall" size={h(54)} color={ROYAL} />
+        style={[
+          st.row,
+          glassTier(t, 'secondary', s(24)),
+          { alignSelf: 'flex-start', marginTop: s(12), height: s(44), paddingLeft: s(4), paddingRight: s(14), gap: s(10), maxWidth: '80%' },
+        ]}>
+        <Sheen radius={s(24)} strength={0.5} height="50%" />
+        <View style={[st.center, glassOrb(t, s(34), true)]}>
+          <MaterialCommunityIcons name="bank" size={s(18)} color={GOLD} />
         </View>
-        <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: F.medium, fontSize: h(46), lineHeight: h(56), color: INK }}>
+        <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: F.semibold, fontSize: s(14.5), lineHeight: s(19), color: INK }}>
           {hallName}
         </Text>
-        <Ionicons name="chevron-forward" size={h(40)} color={INK} style={{ marginLeft: h(8) }} />
+        <Ionicons name="chevron-forward" size={s(16)} color={INK} />
       </Touchable>
 
-      {/* Bell and avatar, split by a hairline */}
+      {/* Today's bookings — large frosted glass panel */}
       <Touchable
-        onPress={onAlerts}
-        accessibilityLabel="Notifications"
-        style={[
-          st.abs,
-          st.center,
-          {
-            left: h(1316),
-            top: h(41),
-            width: h(132),
-            height: h(132),
-            borderRadius: h(66),
-            backgroundColor: 'rgba(244, 247, 253, 0.82)',
-            borderWidth: h(2),
-            borderColor: 'rgba(255, 255, 255, 0.95)',
-            boxShadow: `inset 0px ${h(2)}px 0px rgba(255,255,255,1), 0px ${h(8)}px ${h(22)}px rgba(31, 58, 112, 0.16)`,
-            zIndex: 3,
-          },
-        ]}>
-        <Ionicons name="notifications-outline" size={h(70)} color={NAME} />
-        {hasAlerts ? (
-          <View
-            style={{
-              position: 'absolute',
-              left: h(74),
-              top: h(22),
-              width: h(22),
-              height: h(22),
-              borderRadius: h(11),
-              backgroundColor: '#E8212B',
-              borderWidth: h(2),
-              borderColor: 'rgba(255,255,255,0.95)',
-            }}
-          />
-        ) : null}
-      </Touchable>
-      <View
-        pointerEvents="none"
-        style={[st.abs, { left: h(1487), top: h(60), width: h(2), height: h(96), backgroundColor: 'rgba(110, 122, 155, 0.35)' }]}
-      />
-      <Touchable
-        onPress={onProfile}
-        accessibilityLabel="Profile"
-        style={[
-          st.abs,
-          st.center,
-          {
-            left: h(1527),
-            top: h(41),
-            width: h(132),
-            height: h(132),
-            borderRadius: h(66),
-            backgroundColor: 'rgba(232, 240, 253, 0.92)',
-            borderWidth: h(3),
-            borderColor: 'rgba(255, 255, 255, 0.95)',
-            boxShadow: `inset 0px ${h(2)}px 0px rgba(255,255,255,1), 0px ${h(8)}px ${h(22)}px rgba(31, 58, 112, 0.16)`,
-            zIndex: 3,
-          },
-        ]}>
-        <Text style={{ fontFamily: F.regular, fontSize: h(64), lineHeight: h(76), color: ROYAL }}>{initials}</Text>
-      </Touchable>
-
-      {/* Glass wave sweeping across the photo behind the card, with a glowing crest */}
-      <Svg
-        pointerEvents="none"
-        style={{ position: 'absolute', left: 0, top: 0 }}
-        width={h(REF_WIDTH)}
-        height={h(REF_HEIGHT)}
-        viewBox={`0 0 ${REF_WIDTH} ${REF_HEIGHT}`}>
-        <Defs>
-          <Filter id="waveGlow" x="-10%" y="-60%" width="120%" height="220%">
-            <FeGaussianBlur stdDeviation={9} />
-          </Filter>
-          <Filter id="sparkBlur" x="-200%" y="-200%" width="500%" height="500%">
-            <FeGaussianBlur stdDeviation={6} />
-          </Filter>
-          <LinearGradient id="waveBody" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.55} />
-            <Stop offset="0.5" stopColor="#E3EDFC" stopOpacity={0.35} />
-            <Stop offset="1" stopColor="#D6E4FA" stopOpacity={0.1} />
-          </LinearGradient>
-          <LinearGradient id="waveCrest" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.5} />
-            <Stop offset="0.25" stopColor="#FFFFFF" stopOpacity={1} />
-            <Stop offset="0.6" stopColor="#F2F7FF" stopOpacity={0.85} />
-            <Stop offset="1" stopColor="#FFFFFF" stopOpacity={1} />
-          </LinearGradient>
-        </Defs>
-        <Path d={`${WAVE}L${REF_WIDTH} ${REF_HEIGHT}L0 ${REF_HEIGHT}Z`} fill="url(#waveBody)" />
-        <Path d={WAVE} fill="none" stroke="#C9DCFB" strokeWidth={26} strokeOpacity={0.9} filter="url(#waveGlow)" />
-        <Path d={WAVE} fill="none" stroke="#FFFFFF" strokeWidth={10} strokeOpacity={0.95} filter="url(#waveGlow)" />
-        <Path d={WAVE} fill="none" stroke="url(#waveCrest)" strokeWidth={3.5} />
-        {SPARKS.map(([x, y, r]) => (
-          <Circle key={`${x}-${y}`} cx={x} cy={y} r={r} fill="#FFFFFF" filter="url(#sparkBlur)" />
-        ))}
-        {SPARKS.map(([x, y, r]) => (
-          <Circle key={`c-${x}-${y}`} cx={x} cy={y} r={r * 0.3} fill="#FFFFFF" />
-        ))}
-      </Svg>
-
-      {/* Today's bookings card. Only the curved outline is tappable; its content ignores touches. */}
-      <View
-        accessible
+        onPress={onOpen}
         accessibilityRole="button"
         accessibilityLabel={`Today's bookings: ${count}. ${title}. ${subtitle}`}
-        accessibilityActions={[{ name: 'activate' }]}
-        onAccessibilityAction={onOpen}
-        onStartShouldSetResponder={hit}
-        onResponderGrant={() => setPressed(true)}
-        onResponderTerminate={() => setPressed(false)}
-        onResponderRelease={(e) => {
-          setPressed(false);
-          if (hit(e)) onOpen();
-        }}
-        style={[
-          st.abs,
-          { left: h(CARD_X), top: h(CARD_Y), width: h(CARD_W), height: h(CARD_H) },
-          pressed && { opacity: 0.85, transform: [{ scale: 0.99 }] },
-        ]}>
-        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-          <Svg
-            style={{ position: 'absolute', left: -h(GLOW_PAD), top: -h(GLOW_PAD) }}
-            width={h(CARD_W + GLOW_PAD * 2)}
-            height={h(CARD_H + GLOW_PAD * 2)}
-            viewBox={`${-GLOW_PAD} ${-GLOW_PAD} ${CARD_W + GLOW_PAD * 2} ${CARD_H + GLOW_PAD * 2}`}>
-            <Defs>
-              <Filter id="cardBloom" x="-10%" y="-40%" width="120%" height="180%">
-                <FeGaussianBlur stdDeviation={16} />
-              </Filter>
-              <Filter id="cardHalo" x="-10%" y="-40%" width="120%" height="180%">
-                <FeGaussianBlur stdDeviation={7} />
-              </Filter>
-              <Filter id="cardInner" x="-10%" y="-40%" width="120%" height="180%">
-                <FeGaussianBlur stdDeviation={10} />
-              </Filter>
-              <ClipPath id="cardClip">
-                <Path d={CARD_SHAPE} />
-              </ClipPath>
-              {/* Royal-blue glass: saturated on the left, clearing to misty blue on the right where the photo shows through */}
-              <LinearGradient id="heroCardFill" x1="0" y1="0.4" x2="1" y2="0.6">
-                <Stop offset="0" stopColor="#2257C4" stopOpacity={0.96} />
-                <Stop offset="0.3" stopColor="#3469D0" stopOpacity={0.9} />
-                <Stop offset="0.62" stopColor="#6E97DE" stopOpacity={0.72} />
-                <Stop offset="1" stopColor="#CBDBF4" stopOpacity={0.55} />
-              </LinearGradient>
-              <LinearGradient id="heroCardSheen" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.22} />
-                <Stop offset="0.4" stopColor="#FFFFFF" stopOpacity={0.04} />
-                <Stop offset="1" stopColor="#FFFFFF" stopOpacity={0} />
-              </LinearGradient>
-              <RadialGradient id="flare" cx="0.5" cy="0.5" rx="0.5" ry="0.5">
-                <Stop offset="0" stopColor="#FFFFFF" stopOpacity={1} />
-                <Stop offset="0.35" stopColor="#EAF2FF" stopOpacity={0.6} />
-                <Stop offset="1" stopColor="#EAF2FF" stopOpacity={0} />
-              </RadialGradient>
-              <RadialGradient id="floorGlow" cx="0.5" cy="0.5" rx="0.5" ry="0.5">
-                <Stop offset="0" stopColor="#DCE9FF" stopOpacity={0.55} />
-                <Stop offset="1" stopColor="#DCE9FF" stopOpacity={0} />
-              </RadialGradient>
-            </Defs>
-
-            {/* Outer bloom: a blue-white halo that reads against the pale photo */}
-            <Path d={CARD_SHAPE} fill="none" stroke="#B7D0FA" strokeWidth={44} strokeOpacity={0.85} filter="url(#cardBloom)" />
-            <Path d={CARD_SHAPE} fill="none" stroke="#FFFFFF" strokeWidth={18} filter="url(#cardHalo)" />
-
-            {/* Glass body */}
-            <Path d={CARD_SHAPE} fill="url(#heroCardFill)" />
-            <Path d={CARD_SHAPE} fill="url(#heroCardSheen)" />
-            <G clipPath="url(#cardClip)">
-              <Ellipse cx={CARD_W * 0.42} cy={CARD_H + 20} rx={CARD_W * 0.55} ry={90} fill="url(#floorGlow)" />
-              {/* Inner glow hugging the rim */}
-              <Path d={CARD_SHAPE} fill="none" stroke="#FFFFFF" strokeWidth={30} strokeOpacity={0.75} filter="url(#cardInner)" />
-            </G>
-
-            {/* Crisp glass rim */}
-            <Path d={CARD_SHAPE} fill="none" stroke="#FFFFFF" strokeWidth={5} />
-            <Path d={CARD_SHAPE} fill="none" stroke="#DCE9FF" strokeWidth={1.5} strokeOpacity={0.9} />
-
-            {/* Light flares caught on the rim */}
-            {FLARES.map(([x, y, rx, ry]) => (
-              <Ellipse key={`${x}-${y}`} cx={x} cy={y} rx={rx} ry={ry} fill="url(#flare)" />
-            ))}
-          </Svg>
-
-          <Image
-            source={CARD_MANDALA}
-            tintColor="#FFFFFF"
-            style={{ position: 'absolute', left: h(900), top: h(150), width: h(672), height: h(244), opacity: 0.45 }}
-          />
-
-          {/* Calendar badge and title */}
-          <View
-            style={[
-              st.abs,
-              st.center,
-              {
-                left: h(56),
-                top: h(48),
-                width: h(138),
-                height: h(138),
-                borderRadius: h(32),
-                borderWidth: h(3),
-                borderColor: 'rgba(225, 238, 255, 1)',
-                overflow: 'hidden',
-                boxShadow: `inset 0px ${h(3)}px 0px rgba(255,255,255,0.55), inset 0px 0px ${h(18)}px rgba(255,255,255,0.35), 0px 0px ${h(8)}px ${h(2)}px rgba(255,255,255,0.95), 0px 0px ${h(60)}px ${h(10)}px rgba(150, 200, 255, 0.95)`,
-              },
-            ]}>
-            <Svg style={StyleSheet.absoluteFill} viewBox="0 0 100 100" preserveAspectRatio="none">
-              <Defs>
-                <LinearGradient id="heroTileFill" x1="0" y1="0" x2="0.4" y2="1">
-                  <Stop offset="0" stopColor="#5A93EC" />
-                  <Stop offset="1" stopColor="#2A62CC" />
-                </LinearGradient>
-              </Defs>
-              <Rect width={100} height={100} fill="url(#heroTileFill)" />
-            </Svg>
-            <MaterialCommunityIcons name="calendar-month-outline" size={h(80)} color="#FFFFFF" />
+        style={[glassTier(t, 'primary', s(24)), { marginTop: s(14), paddingHorizontal: s(16), paddingTop: s(14), paddingBottom: s(16), overflow: 'hidden' }]}>
+        <Sheen radius={s(24)} strength={0.55} height="46%" />
+        <Reflection t={t} />
+        <View style={[st.row, { gap: s(12) }]}>
+          <View style={[st.center, goldTile(t, s(42), s(12))]}>
+            <GradientFill from={t.G.gradFrom} to={t.G.gradTo} radius={s(12)} fromOpacity={0.55} toOpacity={0.4} />
+            <MaterialCommunityIcons name="calendar-month-outline" size={s(22)} color={t.dark ? '#FFF4DA' : '#FFFFFF'} />
           </View>
-          <Text
-            style={[
-              st.abs,
-              {
-                left: h(256),
-                top: h(54),
-                fontFamily: F.serifBold,
-                fontSize: h(74),
-                lineHeight: h(84),
-                color: ON_CARD,
-                textShadowColor: 'rgba(10, 30, 90, 0.35)',
-                textShadowOffset: { width: 0, height: h(2) },
-                textShadowRadius: h(6),
-              },
-            ]}>
-            Today&apos;s Bookings
-          </Text>
-          <View style={[st.abs, { left: h(790), top: h(89) }]}>
-            <DiamondRule width={h(190)} diamondAt={h(180)} color={RULE} />
-          </View>
+          <Text style={{ fontFamily: F.semibold, fontSize: s(19), lineHeight: s(26), color: INK, letterSpacing: -0.3 }}>Today&apos;s Bookings</Text>
+          <GoldRule width={s(70)} color={GOLD} />
+        </View>
 
-          {/* Count, divider, headline and next booking */}
+        <View style={[st.row, { marginTop: s(10) }]}>
           <Text
-            style={[
-              st.abs,
-              {
-                left: h(56),
-                top: h(196),
-                width: h(138),
-                textAlign: 'center',
-                fontFamily: F.serifBold,
-                fontSize: h(170),
-                lineHeight: h(176),
-                color: '#FFFFFF',
-                fontVariant: ['lining-nums'],
-                textShadowColor: 'rgba(225, 238, 255, 1)',
-                textShadowOffset: { width: 0, height: 0 },
-                textShadowRadius: h(26),
-              },
-            ]}>
+            style={{
+              width: s(42),
+              textAlign: 'center',
+              fontFamily: F.semibold,
+              fontSize: s(40),
+              lineHeight: s(52),
+              letterSpacing: -0.8,
+              color: INK,
+              fontVariant: ['lining-nums'],
+            }}>
             {count}
           </Text>
-          <View style={[st.abs, { left: h(250), top: h(196), width: h(2.5), height: h(150) }]}>
-            <Svg width="100%" height="100%" viewBox="0 0 2 100" preserveAspectRatio="none">
-              <Defs>
-                <LinearGradient id="heroDivider" x1="0" y1="0" x2="0" y2="1">
-                  <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.15} />
-                  <Stop offset="0.5" stopColor="#FFFFFF" stopOpacity={0.75} />
-                  <Stop offset="1" stopColor="#FFFFFF" stopOpacity={0.15} />
-                </LinearGradient>
-              </Defs>
-              <Rect width={2} height={100} fill="url(#heroDivider)" />
-            </Svg>
+          <View style={{ width: 1, height: s(40), marginHorizontal: s(12), backgroundColor: t.G.rule }} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text numberOfLines={1} style={{ fontFamily: F.semibold, fontSize: s(16), lineHeight: s(22), color: INK, letterSpacing: -0.1 }}>
+              {title}
+            </Text>
+            <Text numberOfLines={1} style={{ fontFamily: F.regular, fontSize: Math.max(s(12), 11), lineHeight: s(17), color: t.G.muted }}>
+              {subtitle}
+            </Text>
           </View>
-          <Text
-            numberOfLines={1}
-            style={[st.abs, { left: h(296), top: h(196), width: h(900), fontFamily: F.bold, fontSize: h(64), lineHeight: h(76), color: '#FFFFFF' }]}>
-            {title}
-          </Text>
-          <Text
-            numberOfLines={1}
-            style={[st.abs, { left: h(296), top: h(290), width: h(900), fontFamily: F.regular, fontSize: h(41), lineHeight: h(50), color: '#E6EEFB' }]}>
-            {subtitle}
-          </Text>
-
-          {/* View pill */}
+          {/* View — a gold-lit glass capsule */}
           <View
             style={[
-              st.abs,
               st.row,
               {
-                left: h(1212),
-                top: h(215),
-                width: h(351),
-                height: h(123),
-                borderRadius: h(62),
-                borderWidth: h(4),
-                borderColor: 'rgba(214, 234, 255, 1)',
-                justifyContent: 'center',
-                gap: h(56),
+                marginLeft: s(8),
+                height: s(38),
+                paddingHorizontal: s(16),
+                gap: s(6),
+                borderRadius: s(19),
+                borderWidth: 1,
+                borderColor: t.G.buttonBorder,
                 overflow: 'hidden',
-                boxShadow: `inset 0px ${h(3)}px 0px rgba(255, 255, 255, 0.45), inset 0px 0px ${h(16)}px rgba(170, 210, 255, 0.55), 0px 0px ${h(10)}px ${h(3)}px rgba(235, 245, 255, 0.95), 0px 0px ${h(64)}px ${h(12)}px rgba(150, 200, 255, 0.95), 0px ${h(10)}px ${h(24)}px rgba(10, 28, 70, 0.2)`,
+                boxShadow: t.G.buttonGlow,
+                ...backdropBlur(20),
               },
             ]}>
-            <Svg style={StyleSheet.absoluteFill} viewBox="0 0 100 100" preserveAspectRatio="none">
-              <Defs>
-                <LinearGradient id="heroViewFill" x1="0" y1="0" x2="0" y2="1">
-                  <Stop offset="0" stopColor="#3F7DE2" />
-                  <Stop offset="0.55" stopColor="#2B63CE" />
-                  <Stop offset="1" stopColor="#1C4DB4" />
-                </LinearGradient>
-              </Defs>
-              <Rect width={100} height={100} fill="url(#heroViewFill)" />
-            </Svg>
-            <Text style={{ fontFamily: F.semibold, fontSize: h(48), lineHeight: h(58), color: '#FFFFFF' }}>View</Text>
-            <Ionicons name="arrow-forward" size={h(50)} color="#FFFFFF" />
+            <GradientFill from={t.G.gradFrom} to={t.G.gradTo} radius={s(19)} horizontal fromOpacity={0.62} toOpacity={0.46} />
+            <Sheen radius={s(19)} strength={0.5} height="50%" />
+            <Text style={st.viewText(s)}>View</Text>
+            <Ionicons name="arrow-forward" size={s(16)} color="#FFFFFF" />
           </View>
         </View>
-      </View>
+      </Touchable>
     </View>
   );
 }
 
-/** Thin gold rule with an outlined diamond, optionally starting from a small dot. */
-function DiamondRule({ width, diamondAt, color, leadDot }: { width: number; diamondAt: number; color: string; leadDot?: boolean }) {
-  const s = width / 100;
-  const d = diamondAt / s;
+/** Round translucent glass button (bell, avatar, hall icon). */
+function glassOrb(t: Theme, size: number, inner = false) {
+  return {
+    ...glassTier(t, 'secondary', size / 2),
+    width: size,
+    height: size,
+    backgroundColor: inner ? t.frost(0.45) : t.dark ? 'rgba(255, 255, 255, 0.10)' : 'rgba(255, 255, 255, 0.35)',
+  };
+}
+
+/** Small icon tile lit with translucent gold. */
+function goldTile(t: Theme, size: number, radius: number) {
+  return {
+    width: size,
+    height: size,
+    borderRadius: radius,
+    borderWidth: 1,
+    borderColor: t.G.buttonBorder,
+    overflow: 'hidden' as const,
+    boxShadow: t.G.buttonGlow,
+  };
+}
+
+/** Thin gold line fading out to a tiny diamond — the panel's subtle accent. */
+function GoldRule({ width, color }: { width: number; color: string }) {
   return (
-    <Svg width={width} height={width * 0.12} viewBox="0 0 100 12">
+    <Svg width={width} height={8} viewBox="0 0 100 8" preserveAspectRatio="none">
       <Defs>
-        <LinearGradient id={leadDot ? 'ruleTail' : 'tagTail'} x1="0" y1="0" x2="1" y2="0">
-          <Stop offset="0" stopColor={color} stopOpacity={0.9} />
-          <Stop offset="1" stopColor={color} stopOpacity={0.15} />
+        <LinearGradient id="heroRule" x1="0" y1="0" x2="90" y2="0" gradientUnits="userSpaceOnUse">
+          <Stop offset="0" stopColor={color} stopOpacity={0.15} />
+          <Stop offset="1" stopColor={color} stopOpacity={0.85} />
         </LinearGradient>
       </Defs>
-      {leadDot ? <Path d="M1 6L2.2 4.8L3.4 6L2.2 7.2Z" fill={color} /> : null}
-      <Path d={`M${leadDot ? 2.2 : 0} 6H${d - 7}`} stroke={color} strokeWidth={0.7} />
-      <Path d={`M${d} 1L${d + 5} 6L${d} 11L${d - 5} 6Z`} fill={color} />
-      <Path d={`M${d + 7} 6H100`} stroke={`url(#${leadDot ? 'ruleTail' : 'tagTail'})`} strokeWidth={0.7} />
+      <Path d="M0 4H90" stroke="url(#heroRule)" strokeWidth={1.2} />
+      <Path d="M95 1L98.5 4L95 7L91.5 4Z" fill={color} />
     </Svg>
   );
 }
 
-const st = StyleSheet.create({
-  abs: { position: 'absolute' },
-  row: { flexDirection: 'row', alignItems: 'center' },
-  center: { alignItems: 'center', justifyContent: 'center' },
-});
+/** A single soft curved reflection across the upper right of the glass, like light on a pane. */
+function Reflection({ t }: { t: Theme }) {
+  const k = t.dark ? 0.35 : 1;
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <Svg width="100%" height="100%" viewBox="0 0 400 130" preserveAspectRatio="none">
+        <Defs>
+          <LinearGradient id="heroRefl" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0} />
+            <Stop offset="0.6" stopColor="#FFFFFF" stopOpacity={0.45 * k} />
+            <Stop offset="1" stopColor="#FFFFFF" stopOpacity={0.1 * k} />
+          </LinearGradient>
+        </Defs>
+        <Path d="M180 0C230 26 300 34 400 18" stroke="url(#heroRefl)" strokeWidth={1.2} fill="none" />
+        <Path d="M220 0C270 18 330 22 400 10V0Z" fill="#FFFFFF" fillOpacity={0.08 * k} />
+      </Svg>
+    </View>
+  );
+}
+
+const st = {
+  ...StyleSheet.create({
+    row: { flexDirection: 'row', alignItems: 'center' },
+    center: { alignItems: 'center', justifyContent: 'center' },
+  }),
+  viewText: (s: (n: number) => number) => ({
+    fontFamily: F.medium,
+    fontSize: s(14),
+    lineHeight: s(18),
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
+    textShadowColor: 'rgba(90, 60, 10, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  }),
+};

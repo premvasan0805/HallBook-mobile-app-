@@ -6,7 +6,7 @@ import { Card } from '@/components/primitives';
 import { Avatar, EventIcon, PaymentBadge } from '@/components/status';
 import { fmtLong, inr } from '@/lib/format';
 import { SLOT_LABEL, useStore, type Booking, type Customer } from '@/lib/store';
-import { C, T } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/lib/theme-context';
 
 export const openBooking = (id: string) => router.push({ pathname: '/booking/[id]', params: { id } });
 export const openCustomer = (id: string) => router.push({ pathname: '/customer/[id]', params: { id } });
@@ -20,6 +20,8 @@ export function BookingCard({ booking, showCustomer = true }: { booking: Booking
   const name = customerById(booking.customerId)?.name ?? 'Unknown customer';
   const eventLine = `${booking.eventType} · ${SLOT_LABEL[booking.slot]}`;
   const cancelled = booking.status === 'cancelled';
+  const { C, T } = useTheme();
+  const st = useSt();
 
   return (
     <Card onPress={() => openBooking(booking.id)} style={st.row}>
@@ -45,6 +47,8 @@ export function BookingCard({ booking, showCustomer = true }: { booking: Booking
 }
 
 export function CustomerCard({ customer, meta }: { customer: Customer; meta?: string }) {
+  const { C, T } = useTheme();
+  const st = useSt();
   return (
     <Card onPress={() => openCustomer(customer.id)} style={st.row}>
       <Avatar name={customer.name} />
@@ -60,7 +64,9 @@ export function CustomerCard({ customer, meta }: { customer: Customer; meta?: st
   );
 }
 
-const st = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 14 },
-  cancelled: { color: C.textMuted, textDecorationLine: 'line-through' },
-});
+const useSt = makeStyles((t) =>
+  StyleSheet.create({
+    row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 14 },
+    cancelled: { color: t.C.textMuted, textDecorationLine: 'line-through' },
+  }),
+);

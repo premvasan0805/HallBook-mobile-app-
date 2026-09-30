@@ -10,7 +10,8 @@ import Svg, { Defs, LinearGradient, Path, Rect, Stop, Text as SvgText, TSpan } f
 import { BrandGradient, Mandala } from '@/components/decor';
 import { goBack, Touchable } from '@/components/primitives';
 import { useStore, type SegmentKey, type SlotKey } from '@/lib/store';
-import { appWidth, C, elevation, F } from '@/lib/theme';
+import { appWidth, F, type Theme } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/lib/theme-context';
 
 export type MciName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
@@ -19,19 +20,19 @@ export const GOLD = '#D2A566';
 const FLORAL = require('../../assets/images/customer/floral-bottom.png');
 
 /** Each booking timing gets its own soft sky tone so the four read apart at a glance. */
-export const SLOT_META: Record<SlotKey, { icon: MciName; fg: string; bg: string }> = {
-  full: { icon: 'white-balance-sunny', fg: '#D98A1C', bg: '#FDF1DC' },
-  first: { icon: 'weather-sunset-up', fg: '#C2334F', bg: '#FCE8EC' },
-  second: { icon: 'moon-waning-crescent', fg: '#6A45B0', bg: '#EEE8F7' },
-  early: { icon: 'weather-sunset', fg: '#2F7F9A', bg: '#E1F1F6' },
-};
+export const slotMeta = (t: Theme): Record<SlotKey, { icon: MciName; fg: string; bg: string }> => ({
+  full: { icon: 'white-balance-sunny', fg: t.tone.sand.fg, bg: t.tone.sand.from },
+  first: { icon: 'weather-sunset-up', fg: t.tone.rose.fg, bg: t.tone.rose.from },
+  second: { icon: 'moon-waning-crescent', fg: t.tone.violet.fg, bg: t.tone.violet.from },
+  early: { icon: 'weather-sunset', fg: t.tone.blue.fg, bg: t.tone.blue.from },
+});
 
 /** Day segments reuse the same sky tones as the timings they make up. */
-export const SEGMENT_META: Record<SegmentKey, { icon: MciName; fg: string; bg: string }> = {
-  early: { icon: 'weather-sunset-up', fg: '#D98A1C', bg: '#FDF1DC' },
-  late: { icon: 'white-balance-sunny', fg: '#D98A1C', bg: '#FDF1DC' },
-  evening: { icon: 'moon-waning-crescent', fg: '#6A45B0', bg: '#EEE8F7' },
-};
+export const segmentMeta = (t: Theme): Record<SegmentKey, { icon: MciName; fg: string; bg: string }> => ({
+  early: { icon: 'weather-sunset-up', fg: t.tone.sand.fg, bg: t.tone.sand.from },
+  late: { icon: 'white-balance-sunny', fg: t.tone.sand.fg, bg: t.tone.sand.from },
+  evening: { icon: 'moon-waning-crescent', fg: t.tone.violet.fg, bg: t.tone.violet.from },
+});
 
 /** Reference artboard the page header is laid out against; `u()` maps its units to dp. */
 const PH_W = 2096;
@@ -41,15 +42,15 @@ const PH_BORDER = 13;
 const PH_ART = require('../../assets/images/header/page-header-art.png');
 const PH_ART_TOP = require('../../assets/images/header/page-header-top.png');
 const PH_ART_W = 1073;
-const PH_BG = '#600B20';
-const PH_IVORY = '#FBF8F7';
 
 /**
- * Burgundy page header for form-style screens: back button, two-tone serif title
+ * Blue page header for form-style screens: back button, two-tone title
  * (`title` in white, `accent` in gold), hall switcher, and a gold mandala + mandap artwork.
  * Also sets a light status bar while the screen is focused.
  */
 export function BrandPageHeader({ title, accent }: { title: string; accent: string }) {
+  const t = useTheme();
+  const st = useSt();
   const insets = useSafeAreaInsets();
   const { hall } = useStore();
   const { width } = useWindowDimensions();
@@ -101,10 +102,10 @@ export function BrandPageHeader({ title, accent }: { title: string; accent: stri
             <SvgText
               x={u(318)}
               y={u(210)}
-              fontFamily={F.pageSerifBold}
-              fontSize={u(140)}
-              letterSpacing={u(-2.9)}
-              fill={PH_IVORY}>
+              fontFamily={F.semibold}
+              fontSize={u(122)}
+              letterSpacing={u(-2.4)}
+              fill={t.C.onPrimary}>
               {title}
               <TSpan fill={`url(#${id}-gold)`}>{` ${accent}`}</TSpan>
             </SvgText>
@@ -119,7 +120,7 @@ export function BrandPageHeader({ title, accent }: { title: string; accent: stri
             <Svg width={u(191)} height={u(191)} viewBox="0 0 191 191">
               <Path
                 d="M59 95.5H134.5M95.5 63L59 95.5L95.5 130.5"
-                stroke="#F1E2D9"
+                stroke={t.C.onPrimarySoft}
                 strokeWidth={6.5}
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -144,7 +145,7 @@ export function BrandPageHeader({ title, accent }: { title: string; accent: stri
             <Svg width={u(52)} height={u(33)} viewBox="0 0 52 33" style={{ marginLeft: u(31), marginTop: u(31) }}>
               <Path
                 d="M4 4L26 27L48 4"
-                stroke={PH_IVORY}
+                stroke={t.C.onPrimary}
                 strokeWidth={5}
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -179,6 +180,7 @@ function HallIcon({ id, size }: { id: string; size: number }) {
 
 /** Faint gold floral peeking in from the lower-left corner of a brand page. */
 export function BrandFloral({ bottom = 0 }: { bottom?: number }) {
+  const st = useSt();
   return <Image source={FLORAL} style={[st.floral, { bottom }]} contentFit="contain" pointerEvents="none" />;
 }
 
@@ -198,7 +200,7 @@ export function GoldRule({ maxWidth = 110 }: { maxWidth?: number }) {
   );
 }
 
-/** Burgundy gradient button with faint mandalas at both ends and a gold icon. */
+/** Blue gradient button with faint mandalas at both ends and a gold icon. */
 export function BrandButton({
   title,
   icon,
@@ -212,6 +214,8 @@ export function BrandButton({
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
+  const t = useTheme();
+  const st = useSt();
   const id = `cta-${useId().replace(/:/g, '')}`;
   return (
     <Touchable
@@ -220,21 +224,22 @@ export function BrandButton({
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       style={[st.cta, style]}>
-      <BrandGradient id={id} from={C.gradientTo} to={C.primaryDark} />
+      <BrandGradient id={id} from={t.C.gradientFrom} to={t.C.gradientTo} />
       <View style={st.ctaArtLeft} pointerEvents="none">
-        <Mandala size={90} color={C.accentOnPrimary} opacity={0.18} />
+        <Mandala size={90} color={t.C.accentOnPrimary} opacity={0.18} />
       </View>
       <View style={st.ctaArtRight} pointerEvents="none">
-        <Mandala size={90} color={C.accentOnPrimary} opacity={0.18} />
+        <Mandala size={90} color={t.C.accentOnPrimary} opacity={0.18} />
       </View>
-      <MaterialCommunityIcons name={icon} size={20} color={C.accentOnPrimary} />
+      <MaterialCommunityIcons name={icon} size={20} color={t.C.accentOnPrimary} />
       <Text style={st.ctaText}>{title}</Text>
     </Touchable>
   );
 }
 
-/** Big burgundy call-to-action pinned to the bottom of a brand page. */
+/** Big blue call-to-action pinned to the bottom of a brand page. */
 export function BrandCta(props: { title: string; icon: MciName; onPress: () => void; disabled?: boolean }) {
+  const st = useSt();
   return (
     <SafeAreaView edges={['bottom']} style={st.footer}>
       <BrandButton {...props} />
@@ -242,31 +247,33 @@ export function BrandCta(props: { title: string; icon: MciName; onPress: () => v
   );
 }
 
-const st = StyleSheet.create({
-  headerShadow: { backgroundColor: PH_BG, boxShadow: '0px 6px 16px rgba(110, 50, 20, 0.16)' },
-  header: { overflow: 'hidden', backgroundColor: PH_BG, borderColor: '#F7C97C' },
-  back: {
-    position: 'absolute',
-    backgroundColor: 'rgba(255,236,236,0.17)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  hallRow: { position: 'absolute', flexDirection: 'row', alignItems: 'flex-start' },
-  hallName: { fontFamily: F.pageSerif, color: PH_IVORY, flexShrink: 1 },
-  floral: { position: 'absolute', left: 0, width: 167, height: 137, opacity: 0.6 },
-  footer: { paddingHorizontal: 14, paddingTop: 8, paddingBottom: 10, backgroundColor: C.bg },
-  cta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    height: 52,
-    borderRadius: 14,
-    overflow: 'hidden',
-    backgroundColor: C.primary,
-    ...elevation,
-  },
-  ctaArtLeft: { position: 'absolute', left: -30, top: -20 },
-  ctaArtRight: { position: 'absolute', right: -30, top: -20 },
-  ctaText: { fontFamily: F.serifBold, fontSize: 21, color: C.onPrimary },
-});
+const useSt = makeStyles((t) =>
+  StyleSheet.create({
+    headerShadow: { backgroundColor: t.C.primaryDark, boxShadow: `0px 6px 16px ${t.shadow}` },
+    header: { overflow: 'hidden', backgroundColor: t.C.primaryDark, borderColor: t.C.accentOnPrimary },
+    back: {
+      position: 'absolute',
+      backgroundColor: t.frost(0.17),
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    hallRow: { position: 'absolute', flexDirection: 'row', alignItems: 'flex-start' },
+    hallName: { fontFamily: F.medium, color: t.C.onPrimary, flexShrink: 1 },
+    floral: { position: 'absolute', left: 0, width: 167, height: 137, opacity: 0.6 },
+    footer: { paddingHorizontal: 14, paddingTop: 8, paddingBottom: 10, backgroundColor: t.background },
+    cta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+      height: 52,
+      borderRadius: 14,
+      overflow: 'hidden',
+      backgroundColor: t.C.primary,
+      ...t.elevation,
+    },
+    ctaArtLeft: { position: 'absolute', left: -30, top: -20 },
+    ctaArtRight: { position: 'absolute', right: -30, top: -20 },
+    ctaText: { fontFamily: F.semibold, fontSize: 15, lineHeight: 20, letterSpacing: 0.2, color: t.C.onPrimary },
+  }),
+);

@@ -7,7 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassBarBackground } from '@/components/glass-bar';
 import type { IconName } from '@/components/primitives';
 import { useStore } from '@/lib/store';
-import { C, F, TAB_BAR_HEIGHT, tabBarGap } from '@/lib/theme';
+import { F, TAB_BAR_HEIGHT, tabBarGap } from '@/lib/theme';
+import { makeStyles, useTheme } from '@/lib/theme-context';
 
 /** Outline icon when idle, filled burgundy icon when active. */
 function tabIcon(outline: IconName, filled: IconName) {
@@ -43,8 +44,9 @@ function CalendarIcon({ color, focused }: { color: ColorValue; focused: boolean 
   );
 }
 
-/** Label with a short burgundy underline marking the active tab. */
+/** Label with a short blue underline marking the active tab. */
 function TabLabel({ focused, color, children }: { focused: boolean; color: ColorValue; children: string }) {
+  const st = useSt();
   return (
     <View style={st.labelWrap}>
       <Text style={[st.label, { color }, focused && { fontFamily: F.semibold }]}>{children}</Text>
@@ -59,21 +61,23 @@ export const unstable_settings = { initialRouteName: 'index' };
 export default function TabsLayout() {
   const { signedIn } = useStore();
   const insets = useSafeAreaInsets();
+  const t = useTheme();
+  const st = useSt();
   if (!signedIn) return <Redirect href="/login" />;
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: TAB_ACTIVE,
-        tabBarInactiveTintColor: TAB_IDLE,
+        tabBarActiveTintColor: t.glass.tabActive,
+        tabBarInactiveTintColor: t.glass.tabIdle,
         tabBarLabel: TabLabel,
         tabBarStyle: [st.bar, { bottom: tabBarGap(insets.bottom) }],
         tabBarBackground: () => <GlassBarBackground radius={BAR_RADIUS} />,
         tabBarItemStyle: st.item,
         tabBarIconStyle: st.icon,
-        tabBarActiveBackgroundColor: 'rgba(206, 223, 250, 0.8)',
-        sceneStyle: { backgroundColor: C.bg },
+        tabBarActiveBackgroundColor: t.glass.tabActiveBg,
+        sceneStyle: { backgroundColor: t.background },
         animation: 'shift',
       }}>
       <Tabs.Screen
@@ -95,11 +99,8 @@ export default function TabsLayout() {
 }
 
 const BAR_RADIUS = 22;
-/** Blue glass tab bar: navy active tab on a pale blue pill, slate idle tabs. */
-const TAB_ACTIVE = '#1F4488';
-const TAB_IDLE = '#2E3A57';
-
-const st = StyleSheet.create({
+/** Glass tab bar: muted blue active tab on a faint blue pill, slate idle tabs (colours from `t.glass`). */
+const useSt = makeStyles((t) => StyleSheet.create({
   /**
    * Floating glass capsule over the scrolling content; the active tab gets a pale blue pill with a short
    * navy bar under its label. Tab screens pad their scroll end with `tabBarClearance`.
@@ -116,8 +117,8 @@ const st = StyleSheet.create({
     borderRadius: BAR_RADIUS,
     backgroundColor: 'transparent',
     borderTopWidth: 0,
-    shadowColor: '#1F3A70',
-    shadowOpacity: 0.12,
+    shadowColor: t.dark ? '#000000' : '#1E1E1E',
+    shadowOpacity: t.dark ? 0.35 : 0.08,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 6 },
     elevation: 6,
@@ -134,5 +135,5 @@ const st = StyleSheet.create({
   labelWrap: { alignItems: 'center', marginTop: 2 },
   label: { fontFamily: F.medium, fontSize: 11, lineHeight: 14 },
   underline: { width: 26, height: 3, borderRadius: 2, marginTop: 5, backgroundColor: 'transparent' },
-  underlineOn: { backgroundColor: TAB_ACTIVE },
-});
+  underlineOn: { backgroundColor: t.glass.tabActive },
+}));
